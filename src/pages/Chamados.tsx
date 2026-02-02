@@ -36,7 +36,7 @@ import {
   Wrench,
   Plus,
 } from "lucide-react";
-import { ChamadoFormModal } from "@/components/chamados/ChamadoFormModal";
+import { ChamadoFormModal } from "@/components/chamados/chamadoFormModal";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -76,6 +76,9 @@ export default function Chamados() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+
+  const getGoogleMapsUrl = (address: string) =>
+    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 
   // Estados dos filtros
   const [statusFilter, setStatusFilter] = useState<string>("todos");
@@ -389,9 +392,19 @@ export default function Chamados() {
                         <TableCell className="max-w-[200px]">
                           <div className="flex items-start gap-2">
                             <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                            <span className="text-sm text-muted-foreground line-clamp-2">
-                              {chamado.address || "—"}
-                            </span>
+                            {chamado.address ? (
+                              <a
+                                href={getGoogleMapsUrl(chamado.address)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title="Abrir no Google Maps"
+                                className="text-sm text-muted-foreground hover:text-primary hover:underline line-clamp-2"
+                              >
+                                {chamado.address}
+                              </a>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">—</span>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell className="text-muted-foreground text-sm">
@@ -411,9 +424,15 @@ export default function Chamados() {
                             <DropdownMenuContent align="end" className="w-48">
                               <DropdownMenuLabel>Ações</DropdownMenuLabel>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem>
-                                <MapPin className="h-4 w-4 mr-2" />
-                                Ver no Mapa
+                              <DropdownMenuItem className="cursor-pointer" disabled={!chamado.address} asChild>
+                                <a
+                                  href={chamado.address ? getGoogleMapsUrl(chamado.address) : "#"}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  <MapPin className="h-4 w-4 mr-2 cursor-pointer" />
+                                  Ver no Mapa
+                                </a>
                               </DropdownMenuItem>
                               {chamado.associate_cars?.associates?.phone && (
                                 <DropdownMenuItem>

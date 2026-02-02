@@ -22,8 +22,6 @@ import {
 } from "@/components/ui/select";
 import {
   Search,
-  Filter,
-  Plus,
   Download,
   Clock,
   CheckCircle2,
@@ -31,8 +29,8 @@ import {
   XCircle,
   MoreHorizontal,
   Phone,
-  MapPin,
   User,
+  MapPin,
   Loader2
 } from "lucide-react";
 import {
@@ -49,8 +47,6 @@ import {
   type AssociateService,
   type Pagination
 } from "@/services/atendimentos.service";
-import { platform } from "process";
-import { set } from "date-fns";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive"; icon: any }> = {
   waiting_initial_message: { label: "Aguardando Mensagem Inicial", variant: "secondary", icon: Clock },
@@ -297,9 +293,8 @@ export default function Atendimentos() {
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="w-[80px]">ID</TableHead>
                     <TableHead>Cliente</TableHead>
-                    <TableHead>Usuário</TableHead>
                     <TableHead>Plataforma</TableHead>
-                    <TableHead>Telefone</TableHead>
+                    <TableHead>Usuário</TableHead>
                     <TableHead>Tipo</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="w-[150px]">Data/Hora</TableHead>
@@ -323,18 +318,24 @@ export default function Atendimentos() {
                         <TableCell className="capitalize text-sm">
                           {atd.association}
                         </TableCell>
-                         <TableCell className="capitalize text-sm">
-                          {atd.associate_cars?.associates?.name || "—"}
-                        </TableCell>
                         <TableCell className="capitalize text-sm">
                           {atd.plataform}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-3">
                             <div className="h-9 w-9 rounded-xl bg-muted flex items-center justify-center">
-                              <Phone className="h-4 w-4 text-muted-foreground" />
+                              <User className="h-4 w-4 text-muted-foreground" />
                             </div>
-                            <span className="font-medium text-sm">{formatPhone(atd.phone)}</span>
+                            <div>
+                              <p className="font-medium text-sm">
+                                {atd.associate_cars?.associates?.name || "—"}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {atd.associate_cars?.associates?.phone
+                                  ? formatPhone(atd.associate_cars.associates.phone)
+                                  : "—"}
+                              </p>
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell>
