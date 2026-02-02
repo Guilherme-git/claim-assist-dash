@@ -1,0 +1,20 @@
+# Desenvolvimento: Vite com hot reload. Use enquanto codifica (porta 8080).
+# Comando: docker compose -f docker-compose.dev.yml up -d --build
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8080:8080"
+    volumes:
+      # Código fonte montado para refletir alterações na hora
+      - .:/app
+      # Evita sobrescrever node_modules do container com o do host
+      - /app/node_modules
+    environment:
+      # Necessário no Windows/WSL para o file watcher detectar mudanças
+      - CHOKIDAR_USEPOLLING=true
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:3001}
+    stdin_open: true
+    tty: true

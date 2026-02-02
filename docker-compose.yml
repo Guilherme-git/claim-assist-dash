@@ -1,3 +1,5 @@
+# Produção: build estático + Nginx. Use para rodar/deploy (porta 8081).
+# Comando: docker compose up -d --build
 services:
   app:
     build: .

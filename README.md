@@ -60,30 +60,7 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
-## Como executar com Docker
-
-A aplicação pode ser executada em container com Docker ou Docker Compose.
-
-**Com Docker:**
-
-```sh
-# Build da imagem
-docker build -t utiliza-front-assistencia .
-
-# Executar o container (app disponível em http://localhost:8081)
-docker run -p 8081:8081 utiliza-front-assistencia
-```
-
-**Com Docker Compose:**
-
-```sh
-# Build e subir o serviço
-docker compose up -d --build
-
-# A aplicação fica disponível em http://localhost:8081
-```
-
-Para parar: `docker compose down`.
+Para instruções de Docker (comandos, dev/produção), veja **[README.Docker.md](README.Docker.md)**.
 
 ## How can I deploy this project?
 
