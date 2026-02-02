@@ -27,9 +27,9 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
-  { icon: PhoneCall, label: "Chamados", href: "/chamados" },
+  { icon: LayoutDashboard, label: "Monitoramento", href: "/dashboard" },
   { icon: Headphones, label: "Atendimentos", href: "/atendimentos"},
+  { icon: PhoneCall, label: "Chamados", href: "/chamados" },
   { icon: Truck, label: "Prestadores", href: "/prestadores" },
   { icon: Users, label: "Equipe", href: "/equipe" },
   { icon: MapPin, label: "Mapa ao Vivo", href: "/mapa" },

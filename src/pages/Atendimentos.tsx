@@ -308,7 +308,6 @@ export default function Atendimentos() {
                     <TableHead>Telefone</TableHead>
                     <TableHead>Tipo</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Prestador</TableHead>
                     <TableHead className="w-[150px]">Data/Hora</TableHead>
                     <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
@@ -329,9 +328,6 @@ export default function Atendimentos() {
                         </TableCell>
                         <TableCell className="capitalize text-sm">
                           {atd.association}
-                        </TableCell>
-                         <TableCell className="capitalize text-sm">
-                          {atd.associate_cars?.associates?.name || "—"}
                         </TableCell>
                         <TableCell className="capitalize text-sm">
                           {atd.plataform}
