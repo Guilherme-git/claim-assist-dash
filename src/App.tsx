@@ -8,6 +8,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Atendimentos from "./pages/Atendimentos";
+import AtendimentoDetalhes from "./pages/AtendimentoDetalhes";
 import Chamados from "./pages/Chamados";
 import Prestadores from "./pages/Prestadores";
 import Equipe from "./pages/Equipe";
@@ -32,6 +33,7 @@ const App = () => (
               <Route path="/dashboard" element={<Index />} />
               <Route path="/chamados" element={<Chamados />} />
               <Route path="/atendimentos" element={<Atendimentos />} />
+              <Route path="/atendimentos/:id" element={<AtendimentoDetalhes />} />
               <Route path="/prestadores" element={<Prestadores />} />
               <Route path="/equipe" element={<Equipe />} />
               <Route path="/mapa" element={<Mapa />} />

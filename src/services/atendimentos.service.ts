@@ -95,4 +95,9 @@ export const atendimentosService = {
     });
     return data;
   },
+
+  getById: async (id: string): Promise<AssociateService> => {
+    const { data } = await api.get<AssociateService>(`/api/associate-services/${id}`);
+    return data;
+  },
 };

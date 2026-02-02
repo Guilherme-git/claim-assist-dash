@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -79,6 +80,7 @@ function getRequestReasonLabel(reason: string | null): string {
 }
 
 export default function Atendimentos() {
+  const navigate = useNavigate();
   const [atendimentos, setAtendimentos] = useState<AssociateService[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(true);
@@ -311,7 +313,11 @@ export default function Atendimentos() {
                     const StatusIcon = statusInfo.icon;
 
                     return (
-                      <TableRow key={atd.id} className="group">
+                      <TableRow 
+                        key={atd.id} 
+                        className="group cursor-pointer hover:bg-muted/50"
+                        onClick={() => navigate(`/atendimentos/${atd.id}`)}
+                      >
                         <TableCell className="font-mono text-sm font-medium text-primary">
                           #AT-{atd.id}
                         </TableCell>
