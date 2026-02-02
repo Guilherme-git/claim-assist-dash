@@ -5,13 +5,16 @@ import { MetricCard } from "@/components/dashboard/MetricCard";
 import { AttendanceTable } from "@/components/dashboard/AttendanceTable";
 import { AttendanceChart } from "@/components/dashboard/AttendanceChart";
 import { QuickStats } from "@/components/dashboard/QuickStats";
+import { useSidebar } from "@/contexts/SidebarContext";
 
 const Index = () => {
+  const { collapsed } = useSidebar();
+
   return (
     <div className="min-h-screen bg-background">
       <Sidebar />
-      
-      <main className="ml-72 transition-all duration-500">
+
+      <main className={`${collapsed ? 'ml-20' : 'ml-72'} transition-all duration-500`}>
         <Header />
         
         <div className="p-8 space-y-8">

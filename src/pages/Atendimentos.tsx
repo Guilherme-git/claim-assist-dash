@@ -356,7 +356,7 @@ export default function Atendimentos() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          Prestador aqui
+                          —
                         </TableCell>
                         <TableCell className="text-muted-foreground text-sm">
                           {formatDateTime(atd.created_at)}

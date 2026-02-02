@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,20 +7,49 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Eye, EyeOff } from "lucide-react";
 import logo from "@/assets/logo-utiliza.png";
+import { authService } from "@/services/auth.service";
+import { toast } from "@/hooks/use-toast";
 
 export default function Auth() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    async function closeSession() {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+    }
+
+    closeSession();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // Simular loading e redirecionar
-    setTimeout(() => {
+    try {
+      const response = await authService.login({ email, password });
+      if (response.token) {
+        localStorage.setItem("token", response.token);
+        if (response.user) {
+          localStorage.setItem("user", JSON.stringify(response.user));
+        }
+        navigate("/dashboard");
+      }
+    } catch (err: unknown) {
+      const apiError = err && typeof err === "object" && "response" in err
+        ? (err as { response?: { data?: { error?: string } } }).response?.data?.error
+        : null;
+      toast({
+        title: "Erro no login",
+        description: apiError || "E-mail ou senha inválidos. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-      navigate("/dashboard");
-    }, 800);
+    }
   };
 
   return (
@@ -58,6 +87,8 @@ export default function Auth() {
                 type="email" 
                 placeholder="seu@email.com" 
                 className="h-12 rounded-xl border-primary/30 bg-primary/5 focus:bg-background focus:border-primary transition-all"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 required
               />
             </div>
@@ -81,6 +112,8 @@ export default function Auth() {
                   type={showPassword ? "text" : "password"} 
                   placeholder="••••••••" 
                   className="h-12 pr-12 rounded-xl border-border/50 bg-muted/30 focus:bg-background focus:border-primary transition-all"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   required
                 />
                 <Button

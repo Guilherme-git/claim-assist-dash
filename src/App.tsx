@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { SidebarProvider } from "@/contexts/SidebarContext";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Atendimentos from "./pages/Atendimentos";
@@ -26,14 +27,16 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Auth />} />
-            <Route path="/dashboard" element={<Index />} />
-            <Route path="/atendimentos" element={<Atendimentos />} />
-            <Route path="/prestadores" element={<Prestadores />} />
-            <Route path="/equipe" element={<Equipe />} />
-            <Route path="/mapa" element={<Mapa />} />
-            <Route path="/historico" element={<Historico />} />
-            <Route path="/relatorios" element={<Relatorios />} />
-            <Route path="/config" element={<Configuracoes />} />
+            <Route element={<ProtectedRoute />}>
+              <Route path="/dashboard" element={<Index />} />
+              <Route path="/atendimentos" element={<Atendimentos />} />
+              <Route path="/prestadores" element={<Prestadores />} />
+              <Route path="/equipe" element={<Equipe />} />
+              <Route path="/mapa" element={<Mapa />} />
+              <Route path="/historico" element={<Historico />} />
+              <Route path="/relatorios" element={<Relatorios />} />
+              <Route path="/config" element={<Configuracoes />} />
+            </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

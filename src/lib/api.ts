@@ -27,30 +27,27 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response) {
-      // Erro com resposta do servidor
       switch (error.response.status) {
         case 401:
-          // Token inválido ou expirado
-          localStorage.removeItem('token');
-          window.location.href = '/auth';
+          // Não redireciona se for falha no login (deixa a página mostrar o erro)
+          const isLoginRequest = error.config?.url?.includes('/api/login');
+          if (!isLoginRequest) {
+            localStorage.removeItem('token');
+            window.location.href = '/';
+          }
           break;
         case 403:
-          console.error('Acesso negado');
           break;
         case 404:
-          console.error('Recurso não encontrado');
           break;
         case 500:
-          console.error('Erro interno do servidor');
           break;
         default:
           console.error('Erro na requisição:', error.response.data);
       }
     } else if (error.request) {
-      // Requisição enviada mas sem resposta
       console.error('Servidor não respondeu:', error.request);
     } else {
-      // Erro ao configurar a requisição
       console.error('Erro ao configurar requisição:', error.message);
     }
     return Promise.reject(error);

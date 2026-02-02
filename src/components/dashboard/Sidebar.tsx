@@ -39,12 +39,30 @@ const bottomItems: NavItem[] = [
   { icon: Settings, label: "Configurações", href: "/config" },
 ];
 
+interface StoredUser {
+  id: string;
+  name: string;
+  email: string;
+}
+
+function getStoredUser(): StoredUser | null {
+  try {
+    const raw = localStorage.getItem("user");
+    return raw ? (JSON.parse(raw) as StoredUser) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function Sidebar() {
   const { collapsed, toggleCollapsed } = useSidebar();
   const location = useLocation();
   const navigate = useNavigate();
+  const user = getStoredUser();
 
   const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
     navigate("/");
   };
 
@@ -135,11 +153,24 @@ export function Sidebar() {
           {!collapsed && (
             <div className="flex items-center gap-3 px-4 py-4 mt-3 rounded-2xl bg-gradient-to-r from-sidebar-accent to-sidebar-accent/50 border border-sidebar-border/30">
               <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-md">
-                <span className="text-sm font-bold text-primary-foreground">AD</span>
+                <span className="text-sm font-bold text-primary-foreground">
+                  {user?.name
+                    ? user.name
+                        .split(/\s+/)
+                        .map((s) => s[0])
+                        .join("")
+                        .slice(0, 2)
+                        .toUpperCase()
+                    : "AD"}
+                </span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-sidebar-foreground truncate">Admin</p>
-                <p className="text-xs text-sidebar-foreground/50 truncate">admin@empresa.com</p>
+                <p className="text-sm font-semibold text-sidebar-foreground truncate">
+                  {user?.name ?? "Admin"}
+                </p>
+                <p className="text-xs text-sidebar-foreground/50 truncate">
+                  {user?.email ?? "—"}
+                </p>
               </div>
               <Button 
                 variant="ghost" 
