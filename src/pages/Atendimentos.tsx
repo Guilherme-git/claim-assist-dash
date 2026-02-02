@@ -128,12 +128,10 @@ export default function Atendimentos() {
     // Filtro de busca (ID, telefone ou endereço)
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
-      const matchId = atd.id.toString().includes(search);
       const matchPhone = atd.phone.toLowerCase().includes(search);
-      const matchOrigin = atd.origin_address?.toLowerCase().includes(search);
-      const matchDestination = atd.destination_address?.toLowerCase().includes(search);
+      const matchAssociate = atd.associate_cars?.associates?.name.toLowerCase().includes(search);
 
-      if (!matchId && !matchPhone && !matchOrigin && !matchDestination) {
+      if (!matchPhone && !matchAssociate) {
         return false;
       }
     }
@@ -148,7 +146,7 @@ export default function Atendimentos() {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por ID, telefone ou local..."
+            placeholder="Busca por usuário ou telefone"
             className="pl-10 h-11 rounded-xl border-border/50 bg-card"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -228,14 +226,10 @@ export default function Atendimentos() {
 
           {/* Ações */}
           <div className="ml-auto flex gap-3">
-            {/* <Button variant="outline" className="h-10 rounded-xl gap-2">
+            <Button variant="outline" className="h-10 rounded-xl gap-2">
               <Download className="h-4 w-4" />
               Exportar
-            </Button> */}
-            <Button className="h-10 rounded-xl gap-2 bg-primary hover:bg-primary/90">
-              <Plus className="h-4 w-4" />
-              Novo
-            </Button>
+            </Button> 
           </div>
         </div>
       )}
@@ -329,6 +323,9 @@ export default function Atendimentos() {
                         <TableCell className="capitalize text-sm">
                           {atd.association}
                         </TableCell>
+                         <TableCell className="capitalize text-sm">
+                          {atd.associate_cars?.associates?.name || "—"}
+                        </TableCell>
                         <TableCell className="capitalize text-sm">
                           {atd.plataform}
                         </TableCell>
@@ -350,9 +347,6 @@ export default function Atendimentos() {
                             <StatusIcon className="h-3 w-3" />
                             {statusInfo.label}
                           </Badge>
-                        </TableCell>
-                        <TableCell>
-                          —
                         </TableCell>
                         <TableCell className="text-muted-foreground text-sm">
                           {formatDateTime(atd.created_at)}
