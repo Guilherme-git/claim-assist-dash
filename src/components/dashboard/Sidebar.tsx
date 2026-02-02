@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Truck,
   Clock,
+  PhoneCall,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import logo from "@/assets/logo-utiliza.png";
@@ -27,6 +28,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
+  { icon: PhoneCall, label: "Chamados", href: "/chamados" },
   { icon: Headphones, label: "Atendimentos", href: "/atendimentos"},
   { icon: Truck, label: "Prestadores", href: "/prestadores" },
   { icon: Users, label: "Equipe", href: "/equipe" },
