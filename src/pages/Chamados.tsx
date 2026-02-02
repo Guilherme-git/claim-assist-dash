@@ -34,7 +34,9 @@ import {
   Loader2,
   Truck,
   Wrench,
+  Plus,
 } from "lucide-react";
+import { ChamadoFormModal } from "@/components/chamados/ChamadoFormModal";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -80,6 +82,7 @@ export default function Chamados() {
   const [serviceTypeFilter, setServiceTypeFilter] = useState<string>("todos");
   const [associationFilter, setAssociationFilter] = useState<string>("todos");
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     async function fetchChamados() {
@@ -241,9 +244,16 @@ export default function Chamados() {
               <Download className="h-4 w-4" />
               Exportar
             </Button>
+            <Button className="h-10 rounded-xl gap-2" onClick={() => setIsModalOpen(true)}>
+              <Plus className="h-4 w-4" />
+              Novo Chamado
+            </Button>
           </div>
         </div>
       )}
+
+      {/* Modal de Novo Chamado */}
+      <ChamadoFormModal open={isModalOpen} onOpenChange={setIsModalOpen} />
 
       {/* Tabela Principal */}
       <Card className="rounded-2xl border-border/50 shadow-soft">
