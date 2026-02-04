@@ -122,7 +122,7 @@ export interface ILevaAssociateSearchResponse {
 export interface Associates {
   id: string;
   ileva_associate_id: string | null;
-  association: string;
+  association: string | null;
   name: string;
   email: string | null;
   phone: string;
@@ -136,7 +136,7 @@ export interface AssociateCars {
   associate_id: string;
   ileva_associate_vehicle_id: string | null;
   fipe_id: string | null;
-  category: string;
+  category: string | null;
   plate: string;
   chassi: string | null;
   brand: string | null;
@@ -182,6 +182,103 @@ export interface AssociateService {
   updated_at: string;
 }
 
+// Motorista de Guincho
+export interface TowingDriver {
+  id: string;
+  status: string;
+  towing_provider_id: string;
+  cpf: string;
+  name: string;
+  phone: string;
+  device_imei: string | null;
+  profile_image_path: string | null;
+  created_at: string;
+  updated_at: string;
+  firebase_message_token: string | null;
+}
+
+// Usuário que criou o chamado
+export interface CallUser {
+  id: string;
+  name: string;
+  email: string;
+}
+
+// Fatura/Cobrança
+export interface CallBill {
+  id: string;
+  call_id: string;
+  value: string;
+  description: string | null;
+  status: string;
+  due_date: string | null;
+  payment_date: string | null;
+  payment_method: string | null;
+  pix_key_type: string | null;
+  pix_key: string | null;
+  payment_vouncher_file_path: string | null;
+  created_at: string;
+  updated_at: string;
+  total_value: string;
+}
+
+// Avaliação
+export interface CallRating {
+  id: string;
+  call_id: string;
+  service_type: string;
+  rating: number;
+  complaint: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Viagem (Coleta/Entrega)
+export interface CallTrip {
+  id: string;
+  call_id: string;
+  workable_type: string | null;
+  workable_id: string | null;
+  type: string;
+  status: string;
+  address: string;
+  started_at: string | null;
+  arrival_expectation: string | null;
+  current_arrival_expectation: string | null;
+  arrival_time: string | null;
+  arrived_at: string | null;
+  finished_at: string | null;
+  observation: string | null;
+  created_at: string;
+  updated_at: string;
+  uf_id: string | null;
+  city_id: string | null;
+  ufs: any | null;
+  cities: any | null;
+}
+
+// Arquivo de Inspeção
+export interface InspectionFile {
+  id: string;
+  inspection_id: string;
+  type: string;
+  path: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Inspeção (Checkin/Checkout)
+export interface CallInspection {
+  id: string;
+  call_id: string;
+  towing_driver_id: string;
+  type: string;
+  created_at: string;
+  updated_at: string;
+  inspection_files: InspectionFile[];
+  towing_drivers?: TowingDriver;
+}
+
 export interface Call {
   id: string;
   towing_service_type: TowingServiceType | string;
@@ -207,14 +304,18 @@ export interface Call {
   webassist_protocol_code: string | null;
   webassist_associate_document: string | null;
   webassist_assistance_code: string | null;
-  uf_id: string;
-  city_id: string;
-  associate_service_id: string;
+  uf_id: string | null;
+  city_id: string | null;
+  associate_service_id: string | null;
   associate_cars?: AssociateCars;
   bikers?: any | null;
-  towing_drivers?: any | null;
+  towing_drivers?: TowingDriver | null;
   associate_services?: AssociateService;
-  users?: any | null;
+  users?: CallUser | null;
+  bills?: CallBill[];
+  ratings?: CallRating[];
+  call_trips?: CallTrip[];
+  inspections?: CallInspection[];
 }
 
 export interface Pagination {
@@ -310,6 +411,58 @@ export const associationLabels: Record<string, string> = {
   agsmb: "Agsmb",
 };
 
+// Labels para status de faturas
+export const billStatusLabels: Record<string, string> = {
+  pending: "Pendente",
+  paid: "Pago",
+  cancelled: "Cancelado",
+  overdue: "Vencido",
+};
+
+// Labels para métodos de pagamento
+export const paymentMethodLabels: Record<string, string> = {
+  pix: "PIX",
+  credit_card: "Cartão de Crédito",
+  debit_card: "Cartão de Débito",
+  cash: "Dinheiro",
+  bank_transfer: "Transferência Bancária",
+};
+
+// Labels para tipos de viagem
+export const callTripTypeLabels: Record<string, string> = {
+  towing_collect: "Coleta",
+  towing_delivery: "Entrega",
+};
+
+// Labels para status de viagem
+export const callTripStatusLabels: Record<string, string> = {
+  pending: "Pendente",
+  in_progress: "Em andamento",
+  finished: "Finalizado",
+  cancelled: "Cancelado",
+};
+
+// Labels para tipos de inspeção
+export const inspectionTypeLabels: Record<string, string> = {
+  checkin: "Check-in",
+  checkout: "Check-out",
+};
+
+// Labels para tipos de arquivo de inspeção
+export const inspectionFileTypeLabels: Record<string, string> = {
+  vehicle_front_side_image: "Frente do Veículo",
+  vehicle_rear_side_image: "Traseira do Veículo",
+  vehicle_left_side_image: "Lateral Esquerda",
+  vehicle_right_side_image: "Lateral Direita",
+};
+
+// Labels para tipos de serviço de avaliação
+export const ratingServiceTypeLabels: Record<string, string> = {
+  towing_driver: "Motorista de Guincho",
+  biker: "Motoboy",
+  service: "Serviço",
+};
+
 // Variantes de Badge baseadas nos status
 export type BadgeVariant = "default" | "secondary" | "outline" | "destructive";
 
@@ -336,6 +489,20 @@ export const callTowingStatusVariants: Record<string, BadgeVariant> = {
   in_checkout: "default",
   waiting_in_shed: "default",
   waiting_add_towing_delivery_call_trip: "destructive",
+  finished: "outline",
+  cancelled: "destructive",
+};
+
+export const billStatusVariants: Record<string, BadgeVariant> = {
+  pending: "secondary",
+  paid: "default",
+  cancelled: "destructive",
+  overdue: "destructive",
+};
+
+export const callTripStatusVariants: Record<string, BadgeVariant> = {
+  pending: "secondary",
+  in_progress: "default",
   finished: "outline",
   cancelled: "destructive",
 };
