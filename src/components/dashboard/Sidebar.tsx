@@ -101,7 +101,8 @@ export function Sidebar() {
           {navItems.map((item, index) => {
             const isActive =
               location.pathname === item.href ||
-              (item.href === "/atendimentos" && location.pathname.startsWith("/atendimentos/"));
+              (item.href === "/atendimentos" && location.pathname.startsWith("/atendimentos/")) ||
+              (item.href === "/chamados" && location.pathname.startsWith("/chamados/"));
             return (
               <Link
                 key={item.label}

@@ -1,41 +1,51 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Headphones, PhoneCall, CheckCircle, Clock, Loader2, Truck, DollarSign, Receipt, CreditCard, CheckCircle2 } from "lucide-react";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { Header } from "@/components/dashboard/Header";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { AttendanceTable } from "@/components/dashboard/AttendanceTable";
 import { QuickStats } from "@/components/dashboard/QuickStats";
+import { DateRangeFilter } from "@/components/dashboard/DateRangeFilter";
 import { useSidebar } from "@/contexts/SidebarContext";
-import { dashboardService, type DashboardData } from "@/services/dashboard.service";
+import { dashboardService, type DashboardData, type DashboardFilters } from "@/services/dashboard.service";
 
 const Index = () => {
   const { collapsed } = useSidebar();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [filters, setFilters] = useState<DashboardFilters | undefined>(undefined);
+
+  const fetchDashboardData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await dashboardService.getData(filters);
+      setDashboardData(data);
+    } catch (err) {
+      console.error('Erro ao buscar dados do dashboard:', err);
+      setError('Não foi possível carregar os dados do dashboard');
+    } finally {
+      setLoading(false);
+    }
+  }, [filters]);
 
   useEffect(() => {
-    async function fetchDashboardData() {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await dashboardService.getData();
-        setDashboardData(data);
-      } catch (err) {
-        console.error('Erro ao buscar dados do dashboard:', err);
-        setError('Não foi possível carregar os dados do dashboard');
-      } finally {
-        setLoading(false);
-      }
-    }
-
     fetchDashboardData();
 
     // Atualizar dados a cada 30 segundos
     const interval = setInterval(fetchDashboardData, 30000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchDashboardData]);
+
+  const handleApplyFilter = (startDate: string, endDate: string) => {
+    setFilters({ start_date: startDate, end_date: endDate });
+  };
+
+  const handleClearFilter = () => {
+    setFilters(undefined);
+  };
 
   // Loading state
   if (loading) {
@@ -81,6 +91,9 @@ const Index = () => {
         <Header />
 
         <div className="p-8 space-y-8">
+          {/* Filtro de Data */}
+          <DateRangeFilter onFilter={handleApplyFilter} onClear={handleClearFilter} />
+
           {/* Metrics Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <MetricCard
@@ -135,7 +148,7 @@ const Index = () => {
                 />
                 <MetricCard
                   title="Boletos Pagos - Chamados"
-                  value={dashboardData.towingTicket.paidBillsCount.toString()}
+                  value={dashboardData.towingTicket?.paidBillsCount?.toString() || "0"}
                   icon={Receipt}
                   variant="danger"
                   delay={500}
@@ -144,11 +157,11 @@ const Index = () => {
             </div>
             <div className="flex flex-col gap-6">
               <QuickStats
-                averageServiceTime={dashboardData.averageServiceTime}
+                averageServiceTime={dashboardData.averageServiceTime || "0min"}
               />
               <MetricCard
                 title="Taxa de Resolução - Chamados"
-                value={dashboardData.quickStats.resolutionRate}
+                value={dashboardData.quickStats?.resolutionRate || "0%"}
                 icon={CheckCircle2}
                 variant="primary"
                 delay={600}

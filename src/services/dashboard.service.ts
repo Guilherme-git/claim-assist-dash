@@ -120,13 +120,26 @@ export const platformLabels: Record<string, string> = {
 // SERVICE
 // ============================================
 
+export interface DashboardFilters {
+  start_date?: string; // Formato: YYYY-MM-DD
+  end_date?: string;   // Formato: YYYY-MM-DD
+}
+
 export const dashboardService = {
   /**
    * GET /api/dashboard
    * Busca dados completos do dashboard
+   * @param filters - Filtros opcionais (start_date, end_date)
    */
-  getData: async (): Promise<DashboardData> => {
-    const { data } = await api.get<DashboardData>('/api/dashboard');
+  getData: async (filters?: DashboardFilters): Promise<DashboardData> => {
+    const params = new URLSearchParams();
+    if (filters?.start_date) params.append('start_date', filters.start_date);
+    if (filters?.end_date) params.append('end_date', filters.end_date);
+
+    const queryString = params.toString();
+    const url = `/api/dashboard${queryString ? `?${queryString}` : ''}`;
+
+    const { data } = await api.get<DashboardData>(url);
     return data;
   },
 };

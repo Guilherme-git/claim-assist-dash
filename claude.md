@@ -1392,6 +1392,24 @@ import { Home, FileText, Phone } from 'lucide-react';
 </nav>
 ```
 
+#### **Estado Ativo dos Menus**
+
+O Sidebar mantém os itens de menu ativos tanto nas páginas de listagem quanto nas páginas de detalhes. Isso garante que o usuário sempre saiba em qual seção está navegando.
+
+```typescript
+// src/components/dashboard/Sidebar.tsx
+const isActive =
+  location.pathname === item.href ||
+  (item.href === "/atendimentos" && location.pathname.startsWith("/atendimentos/")) ||
+  (item.href === "/chamados" && location.pathname.startsWith("/chamados/"));
+```
+
+**Comportamento:**
+- `/atendimentos` → Menu "Atendimentos" ativo
+- `/atendimentos/123` → Menu "Atendimentos" continua ativo
+- `/chamados` → Menu "Chamados" ativo
+- `/chamados/456` → Menu "Chamados" continua ativo
+
 ---
 
 ## 🔐 AUTENTICAÇÃO
@@ -2480,6 +2498,445 @@ export function ItemFormModal({ open, onOpenChange, onSuccess }: ItemFormModalPr
 
 ---
 
+## 📄 PÁGINA DE DETALHES DO CHAMADO
+
+### **ChamadoDetalhes.tsx**
+
+Página que exibe informações completas de um chamado específico, incluindo dados do associado, veículo, motorista, viagens, inspeções, faturas e avaliações.
+
+**Arquivo:** `src/pages/ChamadoDetalhes.tsx`
+
+---
+
+### **📡 Endpoint da API**
+
+#### **GET /api/calls/guinchos/:id**
+
+Busca um chamado específico por ID com todos os relacionamentos.
+
+**URL:** `http://localhost:3001/api/calls/guinchos/{ID_CHAMADO}`
+
+**Método:** GET
+
+**Headers:**
+```
+Authorization: Bearer {token}
+```
+
+**Resposta:**
+```typescript
+{
+  // Dados principais do chamado
+  id: string;
+  towing_service_type: string;
+  address: string;
+  observation: string;
+  status: string | null;
+  towing_status: string;
+  creation_method: string;
+  association: string;
+  created_at: string;
+  updated_at: string;
+
+  // Dados do veículo e associado
+  associate_cars: {
+    id: string;
+    plate: string;
+    brand: string;
+    model: string;
+    color: string;
+    year: string;
+    associates: {
+      id: string;
+      name: string;
+      email: string;
+      phone: string;
+      cpf: string;
+    }
+  };
+
+  // Motorista de guincho
+  towing_drivers: {
+    id: string;
+    name: string;
+    phone: string;
+    cpf: string;
+    profile_image_path: string;
+  };
+
+  // Usuário que criou o chamado
+  users: {
+    id: string;
+    name: string;
+    email: string;
+  };
+
+  // Faturas/boletos
+  bills: Array<{
+    id: string;
+    value: string;
+    status: string;
+    payment_date: string;
+    payment_method: string;
+    total_value: string;
+  }>;
+
+  // Avaliações
+  ratings: Array<{
+    id: string;
+    service_type: string;
+    rating: number;
+    complaint: string | null;
+    created_at: string;
+  }>;
+
+  // Viagens (coleta e entrega)
+  call_trips: Array<{
+    id: string;
+    type: "towing_collect" | "towing_delivery";
+    status: string;
+    address: string;
+    started_at: string;
+    finished_at: string;
+  }>;
+
+  // Inspeções (checkin/checkout)
+  inspections: Array<{
+    id: string;
+    type: "checkin" | "checkout";
+    created_at: string;
+    inspection_files: Array<{
+      id: string;
+      type: string;
+      path: string;
+    }>;
+    towing_drivers: {
+      name: string;
+    };
+  }>;
+
+  // Solicitações de serviço e propostas
+  call_service_requests: Array<{
+    id: string;
+    status: string;
+    distance_between_trips_text: string;
+    duration_between_trips_text: string;
+    call_service_proposals: Array<{
+      id: string;
+      status: "accepted" | "rejected";
+      proposed_price_departure: string;
+      proposed_price_excess_mileage: string;
+      towing_drivers: {
+        name: string;
+        phone: string;
+      };
+    }>;
+  }>;
+}
+```
+
+---
+
+### **🔧 Service Method**
+
+**Arquivo:** `src/services/calls.service.ts`
+
+```typescript
+/**
+ * GET /api/calls/guinchos/:id
+ * Busca um chamado específico por ID
+ */
+getById: async (id: string): Promise<Call> => {
+  const { data } = await api.get<Call>(`/api/calls/guinchos/${id}`);
+  return data;
+}
+```
+
+**Uso:**
+```typescript
+import { callsService } from '@/services/calls.service';
+
+const chamado = await callsService.getById('43016');
+```
+
+---
+
+### **🧩 Componentes da Página**
+
+A página é dividida em componentes modulares para melhor organização:
+
+#### **1. Informações do Chamado**
+Card principal com:
+- ID do chamado
+- Associação
+- Tipo de serviço
+- Método de criação
+- Datas de criação e atualização
+- Endereço com link para Google Maps
+- Observações
+
+#### **2. Execução do Serviço**
+Card com informações de execução:
+- Status do chamado
+- Status do guincho
+- Tempo de aceite do motorista
+- Tempo estimado de chegada
+- Códigos WebAssist (se houver)
+
+#### **3. Coluna Lateral (Cards)**
+
+**Dados do Associado:**
+- Nome
+- CPF (com botão copiar)
+- Telefone (com botão copiar)
+- E-mail
+- Data de cadastro
+
+**Dados do Veículo:**
+- Placa (destaque)
+- Marca/Modelo
+- Ano
+- Cor
+- Categoria
+- Chassi (se houver)
+
+**Motorista de Guincho:**
+- Componente: `TowingDriverCard`
+- Nome, telefone, CPF
+- Status
+
+**Criado por:**
+- Componente: `CreatedByCard`
+- Nome e e-mail do usuário
+
+**Faturas:**
+- Componente: `BillsCard`
+- Lista de boletos/pagamentos
+- Status, valor, método de pagamento
+
+**Avaliações:**
+- Componente: `RatingsCard`
+- Notas (estrelas) e reclamações
+
+#### **4. Componentes Principais**
+
+**Viagens:**
+- Componente: `CallTripsCard`
+- Coleta (towing_collect)
+- Entrega (towing_delivery)
+- Endereços e horários
+
+**Inspeções:**
+- Componente: `InspectionsCard`
+- Checkin (fotos iniciais)
+- Checkout (fotos finais)
+- Galeria de imagens
+
+---
+
+### **📋 Componentes Modulares**
+
+Cada seção tem seu próprio componente para facilitar manutenção:
+
+**Localização:** `src/components/chamados/`
+
+| Componente | Descrição | Props |
+|------------|-----------|-------|
+| `TowingDriverCard` | Dados do motorista de guincho | `driver` |
+| `BillsCard` | Lista de faturas/boletos | `bills[]` |
+| `RatingsCard` | Avaliações do serviço | `ratings[]` |
+| `CallTripsCard` | Viagens (coleta/entrega) | `trips[]` |
+| `InspectionsCard` | Inspeções com fotos | `inspections[]` |
+| `CreatedByCard` | Usuário que criou o chamado | `user` |
+
+---
+
+### **🎨 Layout e Estrutura**
+
+**Grid Responsivo:**
+```typescript
+<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  {/* Coluna Principal (2/3) */}
+  <div className="lg:col-span-2 space-y-6">
+    {/* Informações do Chamado */}
+    {/* Execução do Serviço */}
+    {/* Viagens */}
+    {/* Inspeções */}
+  </div>
+
+  {/* Coluna Lateral (1/3) */}
+  <div className="space-y-6">
+    {/* Dados do Associado */}
+    {/* Dados do Veículo */}
+    {/* Motorista de Guincho */}
+    {/* Criado por */}
+    {/* Faturas */}
+    {/* Avaliações */}
+  </div>
+</div>
+```
+
+**Características:**
+- Cards com `rounded-2xl` e `shadow-soft`
+- Botões "Copiar" para CPF, telefone, chassi, etc.
+- Links externos para Google Maps
+- Badges coloridos para status
+- Galeria de imagens das inspeções
+
+---
+
+### **🔄 Estados e Loading**
+
+**Estados:**
+```typescript
+const [chamado, setChamado] = useState<Call | null>(null);
+const [loading, setLoading] = useState(true);
+const [error, setError] = useState<string | null>(null);
+```
+
+**Loading State:**
+- Exibe `Loader2` animado
+- Mensagem "Carregando detalhes..."
+
+**Error State:**
+- Ícone `AlertCircle`
+- Mensagem de erro da API
+- Botão "Voltar para Chamados"
+
+---
+
+### **🗺️ Funcionalidades**
+
+#### **1. Copiar para Clipboard**
+```typescript
+const copyToClipboard = (text: string) => {
+  navigator.clipboard.writeText(text);
+  toast.success("Copiado para a área de transferência!");
+};
+```
+
+**Usado em:**
+- CPF
+- Telefone
+- Chassi
+- Placa
+- Códigos WebAssist
+
+#### **2. Link para Google Maps**
+```typescript
+const getGoogleMapsUrl = (address: string) =>
+  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+```
+
+**Uso:**
+```typescript
+<a
+  href={getGoogleMapsUrl(chamado.address)}
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  Ver no mapa
+</a>
+```
+
+#### **3. Formatação de Dados**
+
+**Data/Hora:**
+```typescript
+import { formatDateTime } from "@/lib/utils";
+formatDateTime(chamado.created_at); // "04/02/2026 08:55"
+```
+
+**Telefone:**
+```typescript
+import { formatPhone } from "@/lib/utils";
+formatPhone("85994390988"); // "(85) 99439-0988"
+```
+
+---
+
+### **📌 Labels e Mapeamentos**
+
+**Categoria do Veículo:**
+```typescript
+const categoryLabels: Record<string, string> = {
+  car: "Carro",
+  van: "Van",
+  pickup_truck: "Pickup",
+  motorcycle: "Moto",
+  truck: "Caminhão",
+  trailer: "Reboque",
+  bus: "Ônibus",
+};
+```
+
+**Método de Criação:**
+```typescript
+const creationMethodLabels: Record<string, string> = {
+  webassist: "WebAssist",
+  manually: "Manual",
+  associate_service: "Serviço do Associado",
+};
+```
+
+**Status e Variantes:**
+- Importados de `@/services/calls.service`:
+  - `callStatusLabels`
+  - `callStatusVariants`
+  - `callTowingStatusLabels`
+  - `callTowingStatusVariants`
+  - `towingServiceTypeLabels`
+  - `associationLabels`
+
+---
+
+### **✅ Checklist de Implementação**
+
+Ao modificar a página de detalhes:
+
+- [ ] Sempre buscar dados via `callsService.getById(id)`
+- [ ] Tratar estados de loading e error
+- [ ] Usar componentes modulares para cada seção
+- [ ] Manter layout responsivo (lg:col-span-2 + lg:col-span-1)
+- [ ] Adicionar botões "Copiar" para dados importantes
+- [ ] Usar badges com variantes corretas para status
+- [ ] Formatar datas com `formatDateTime()`
+- [ ] Formatar telefones com `formatPhone()`
+- [ ] Incluir links para Google Maps em endereços
+- [ ] Exibir "—" ou "Não informado" para campos vazios
+- [ ] Usar toast para feedback de ações do usuário
+- [ ] Manter consistência visual com outros cards do dashboard
+
+---
+
+### **🚀 Navegação**
+
+**Rota:**
+```
+/chamados/:id
+```
+
+**Exemplo:**
+```
+/chamados/43016
+```
+
+**Botão Voltar:**
+```typescript
+<Button onClick={() => navigate("/chamados")}>
+  <ArrowLeft className="h-4 w-4" />
+  Voltar
+</Button>
+```
+
+**Navegação da lista:**
+```typescript
+// Em Chamados.tsx
+<TableRow onClick={() => navigate(`/chamados/${chamado.id}`)}>
+```
+
+---
+
 ## 🎯 RESUMO EXECUTIVO
 
 ### **✅ REGRAS DE OURO**
@@ -2505,8 +2962,63 @@ O dashboard principal (`src/pages/Index.tsx`) exibe métricas de atendimento e g
 
 #### **🎯 Componentes do Dashboard**
 
-1. **MetricCard** - Cards de métricas com variantes de cor
-2. **QuickStats** - Estatísticas rápidas de atendimento
+1. **DateRangeFilter** - Filtro de período com range de datas (obrigatório)
+2. **MetricCard** - Cards de métricas com variantes de cor
+3. **QuickStats** - Estatísticas rápidas de atendimento
+
+---
+
+### **📅 Filtro de Data (DateRangeFilter)**
+
+**Arquivo:** `src/components/dashboard/DateRangeFilter.tsx`
+
+Componente de filtro de período que permite filtrar os dados do dashboard por um intervalo de datas. Ambas as datas (início e fim) são obrigatórias para aplicar o filtro.
+
+#### **Funcionalidades**
+
+- Seleção de data de início e data de fim via calendário
+- Validação: data fim não pode ser anterior à data início
+- Botão "Aplicar Filtro" habilitado apenas quando ambas as datas estão selecionadas
+- Botão "Limpar" para remover os filtros e voltar aos dados padrão
+- Formatação automática de datas para o formato da API (YYYY-MM-DD)
+
+#### **API Endpoint com Filtros**
+
+```
+GET http://localhost:3001/api/dashboard?start_date=2026-02-01&end_date=2026-02-04
+```
+
+**Parâmetros de Query:**
+- `start_date` - Data inicial no formato YYYY-MM-DD (obrigatório quando usando filtro)
+- `end_date` - Data final no formato YYYY-MM-DD (obrigatório quando usando filtro)
+
+#### **Exemplo de Uso**
+
+```typescript
+// src/pages/Index.tsx
+const [filters, setFilters] = useState<DashboardFilters | undefined>(undefined);
+
+const handleApplyFilter = (startDate: string, endDate: string) => {
+  setFilters({ start_date: startDate, end_date: endDate });
+};
+
+const handleClearFilter = () => {
+  setFilters(undefined);
+};
+
+// No JSX
+<DateRangeFilter onFilter={handleApplyFilter} onClear={handleClearFilter} />
+```
+
+#### **Interface de Filtros**
+
+```typescript
+// src/services/dashboard.service.ts
+export interface DashboardFilters {
+  start_date?: string; // Formato: YYYY-MM-DD
+  end_date?: string;   // Formato: YYYY-MM-DD
+}
+```
 
 ---
 
@@ -2824,6 +3336,16 @@ Distribuição de cores para evitar repetição e criar hierarquia visual:
 ### **📋 Endpoint do Dashboard**
 
 **GET /api/dashboard**
+
+**Query Parameters (opcionais):**
+- `start_date` - Data inicial para filtrar dados (formato: YYYY-MM-DD)
+- `end_date` - Data final para filtrar dados (formato: YYYY-MM-DD)
+
+**Exemplos:**
+```
+GET /api/dashboard
+GET /api/dashboard?start_date=2026-02-01&end_date=2026-02-04
+```
 
 **Resposta esperada:**
 ```json

@@ -46,7 +46,6 @@ export function RatingsCard({ ratings }: RatingsCardProps) {
           </div>
           {ratings.length > 0 && (
             <div className="text-right">
-              <p className="text-sm text-muted-foreground">Média</p>
               <div className="flex items-center gap-2">
                 <span className="text-lg font-bold">{averageRating.toFixed(1)}</span>
                 {renderStars(Math.round(averageRating))}

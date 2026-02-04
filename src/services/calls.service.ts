@@ -570,6 +570,15 @@ export const callsService = {
   },
 
   /**
+   * GET /api/calls/guinchos/:id
+   * Busca um chamado específico por ID
+   */
+  getById: async (id: string): Promise<Call> => {
+    const { data } = await api.get<Call>(`/api/calls/guinchos/${id}`);
+    return data;
+  },
+
+  /**
    * POST /api/calls/guinchos
    * Cria um novo chamado de guincho
    */
