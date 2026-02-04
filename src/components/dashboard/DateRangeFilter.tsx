@@ -126,7 +126,7 @@ export function DateRangeFilter({ onFilter, onClear }: DateRangeFilterProps) {
           )}
 
           <Button
-            onClick={() => navigate("/acompanhamento")}
+            onClick={() => navigate("/acompanhamento-fullscreen")}
             variant="outline"
             size="sm"
             className="rounded-xl gap-2"
