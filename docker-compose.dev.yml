@@ -14,7 +14,8 @@ services:
       - /app/node_modules
     environment:
       # Necessário no Windows/WSL para o file watcher detectar mudanças
-      - CHOKIDAR_USEPOLLING=true
-      - VITE_API_URL=${VITE_API_URL:-http://localhost:3001}
+      CHOKIDAR_USEPOLLING: true
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:3001}
+      VITE_GOOGLE_MAPS_API_KEY: ${VITE_GOOGLE_MAPS_API_KEY}
     stdin_open: true
     tty: true

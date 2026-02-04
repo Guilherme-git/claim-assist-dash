@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { formatPhone, formatDateTime } from "@/lib/utils";
 import { atendimentosService, type AssociateService } from "@/services/atendimentos.service";
+import { callTowingStatusLabels } from "@/services/calls.service";
 import { toast } from "sonner";
 
 // Mapeamento de labels do service_form
@@ -153,7 +154,27 @@ export default function AtendimentoDetalhes() {
   const StatusIcon = statusInfo.icon;
   const associate = atendimento.associate_cars?.associates;
   const vehicle = atendimento.associate_cars;
-  const serviceForm = atendimento.service_form?.payload;
+  /**
+   * API pode enviar service_form de duas formas:
+   * 1) { payload: { vehicle_cargo: "...", ... }, flow_token?: "..." }
+   * 2) Objeto plano: { vehicle_cargo: "...", associate_items: "...", ... }
+   */
+  const raw = atendimento.service_form;
+  let serviceFormPayload: Record<string, string> | undefined;
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    const obj = raw as Record<string, unknown>;
+    const nested = obj.payload;
+    if (nested != null && typeof nested === "object" && !Array.isArray(nested)) {
+      serviceFormPayload = nested as Record<string, string>;
+    } else {
+      const { flow_token: _ft, ...rest } = obj;
+      const flat = rest as Record<string, string>;
+      serviceFormPayload = Object.keys(flat).length > 0 ? flat : undefined;
+    }
+  } else {
+    serviceFormPayload = undefined;
+  }
+  const calls = atendimento.calls ?? [];
 
   return (
     <DashboardLayout 
@@ -269,8 +290,8 @@ export default function AtendimentoDetalhes() {
             </CardContent>
           </Card>
 
-          {/* Card: Formulário de Serviço */}
-          {serviceForm && Object.keys(serviceForm).length > 0 && (
+          {/* Card: Formulário de Serviço (questionário do service_form) */}
+          {serviceFormPayload && Object.keys(serviceFormPayload).length > 0 && (
             <Card className="rounded-2xl border-border/50 shadow-soft">
               <CardHeader className="pb-4">
                 <div className="flex items-center gap-3">
@@ -285,15 +306,56 @@ export default function AtendimentoDetalhes() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {Object.entries(serviceForm).map(([key, value]) => {
-                    const label = serviceFormLabels[key] || key;
+                  {Object.entries(serviceFormPayload).map(([key, value]) => {
+                    if (value == null || value === "") return null;
+                    const label = serviceFormLabels[key] || key.replace(/_/g, " ");
                     return (
                       <div key={key} className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-4 py-2 border-b border-border/50 last:border-0">
                         <p className="text-sm text-muted-foreground sm:w-1/2">{label}</p>
-                        <p className="font-medium sm:w-1/2">{String(value) || "—"}</p>
+                        <p className="font-medium sm:w-1/2">{String(value)}</p>
                       </div>
                     );
                   })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Card: Chamados vinculados (dados da API) */}
+          {calls.length > 0 && (
+            <Card className="rounded-2xl border-border/50 shadow-soft">
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
+                    <MessageSquare className="h-5 w-5 text-amber-500" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg">Chamado vinculado</CardTitle>
+                    <CardDescription>Chamados associados a este atendimento</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {calls.map((call) => (
+                    <div key={call.id} className="rounded-xl border border-border/50 p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-sm text-muted-foreground">#{call.id}</span>
+                        <Badge variant="outline">
+                          {callTowingStatusLabels[call.towing_status ?? ""] ?? call.towing_status ?? "—"}
+                        </Badge>
+                      </div>
+                      {call.address && (
+                        <div className="flex items-start gap-2 text-sm">
+                          <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                          <span>{call.address}</span>
+                        </div>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        Criado em {formatDateTime(call.created_at)}
+                      </p>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>

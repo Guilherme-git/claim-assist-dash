@@ -8,10 +8,10 @@ export function Header() {
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">Dashboard</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">Monitoramento</h1>
           </div>
           <p className="text-sm text-muted-foreground">
-            Bem-vindo ao painel de controle • Atualizado há 2 minutos
+            Bem-vindo ao painel de controle • Atualizado há 30 segundos
           </p>
         </div>
 

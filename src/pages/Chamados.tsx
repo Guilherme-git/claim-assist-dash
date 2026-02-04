@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -51,9 +51,9 @@ import {
   type Call,
   type Pagination,
   callTowingStatusLabels,
+  callTowingStatusVariants,
   towingServiceTypeLabels,
   associationLabels,
-  callTowingStatusVariants,
 } from "@/services/calls.service";
 
 // Ícones por tipo de status de guincho
@@ -80,63 +80,49 @@ export default function Chamados() {
   const getGoogleMapsUrl = (address: string) =>
     `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 
-  // Estados dos filtros
-  const [statusFilter, setStatusFilter] = useState<string>("todos");
+  // Estados dos filtros (aplicados na API)
   const [serviceTypeFilter, setServiceTypeFilter] = useState<string>("todos");
   const [associationFilter, setAssociationFilter] = useState<string>("todos");
+  const [statusFilter, setStatusFilter] = useState<string>("todos");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // Função para buscar chamados (reutilizável)
+  const fetchChamados = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await callsService.getAll({
+        page: currentPage,
+        limit: 10,
+        status: statusFilter !== "todos" ? statusFilter : undefined,
+        towing_service_type: serviceTypeFilter !== "todos" ? serviceTypeFilter : undefined,
+        association: associationFilter !== "todos" ? associationFilter : undefined,
+        search: searchTerm || undefined,
+      });
+      setChamados(response.data);
+      setPagination(response.pagination);
+    } catch (err) {
+      console.error('Erro ao buscar chamados:', err);
+      setError('Não foi possível carregar os chamados. Verifique se a API está rodando em http://localhost:3001');
+    } finally {
+      setLoading(false);
+    }
+  }, [currentPage, statusFilter, serviceTypeFilter, associationFilter, searchTerm]);
+
   useEffect(() => {
-    async function fetchChamados() {
-      try {
-        setLoading(true);
-        setError(null);
-        const response = await callsService.getAll(currentPage);
-        setChamados(response.data);
-        setPagination(response.pagination);
-      } catch (err) {
-        console.error('Erro ao buscar chamados:', err);
-        setError('Não foi possível carregar os chamados. Verifique se a API está rodando em http://localhost:3001');
-      } finally {
-        setLoading(false);
-      }
-    }
-
     fetchChamados();
-  }, [currentPage]);
+  }, [fetchChamados]);
 
-  // Filtra os chamados localmente
-  const chamadosFiltrados = chamados.filter((chamado) => {
-    // Filtro de status (towing_status)
-    if (statusFilter !== "todos" && chamado.towing_status !== statusFilter) {
-      return false;
-    }
+  // Callback para recarregar após criar chamado
+  const handleChamadoCreated = () => {
+    fetchChamados();
+  };
 
-    // Filtro de tipo de serviço
-    if (serviceTypeFilter !== "todos" && chamado.towing_service_type !== serviceTypeFilter) {
-      return false;
-    }
-
-    // Filtro de associação
-    if (associationFilter !== "todos" && chamado.association !== associationFilter) {
-      return false;
-    }
-
-    // Filtro de busca (ID, nome, placa, endereço)
-    if (searchTerm) {
-      const search = searchTerm.toLowerCase();
-      const matchName = chamado.associate_cars?.associates?.name.toLowerCase().includes(search);
-      const matchPlate = chamado.associate_cars?.plate.toLowerCase().includes(search);
-      const matchAddress = chamado.address?.toLowerCase().includes(search);
-
-      if (!matchName && !matchPlate && !matchAddress) {
-        return false;
-      }
-    }
-
-    return true;
-  });
+  const applyFilter = (setter: (v: string) => void, value: string) => {
+    setter(value);
+    setCurrentPage(1);
+  };
 
   return (
     <DashboardLayout title="Chamados" subtitle="Gerencie os chamados de assistência em tempo real">
@@ -145,18 +131,108 @@ export default function Chamados() {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por usuário, placa ou endereço"
+            placeholder="Buscar por nome, placa ou endereço..."
             className="pl-10 h-11 rounded-xl border-border/50 bg-card"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1);
+            }}
           />
         </div>
       </div>
 
-      {/* Info de Paginação + Filtros */}
+      {/* Filtros */}
+      <div className="mb-6 flex items-center gap-3 flex-wrap">
+         {/* Filtro de Associação (calls_association) */}
+        <Select value={associationFilter} onValueChange={(v) => applyFilter(setAssociationFilter, v)}>
+          <SelectTrigger className="w-[180px] h-10 rounded-xl">
+            <SelectValue placeholder="Filtrar por Cliente" />
+          </SelectTrigger>
+          <SelectContent className="cursor-pointer">
+            <SelectItem className="cursor-pointer" value="todos">Todos os Clientes</SelectItem>
+            <SelectItem className="cursor-pointer" value="solidy">Solidy</SelectItem>
+            <SelectItem className="cursor-pointer" value="nova">Nova</SelectItem>
+            <SelectItem className="cursor-pointer" value="motoclub">Motoclub</SelectItem>
+            <SelectItem className="cursor-pointer" value="aprovel">AAPROVEL</SelectItem>
+          </SelectContent>
+        </Select>
+        
+        {/* Filtro de Tipo de Serviço */}
+        <Select value={serviceTypeFilter} onValueChange={(v) => applyFilter(setServiceTypeFilter, v)}>
+          <SelectTrigger className="w-[220px] h-10 rounded-xl">
+            <SelectValue placeholder="Filtrar por Serviço" />
+          </SelectTrigger>
+          <SelectContent className="cursor-pointer max-h-[300px]">
+            <SelectItem className="cursor-pointer" value="todos">Todos os Serviços</SelectItem>
+            <SelectItem className="cursor-pointer" value="towing">Reboque</SelectItem>
+            <SelectItem className="cursor-pointer" value="towing_breakdown">Reboque com Falha</SelectItem>
+            <SelectItem className="cursor-pointer" value="battery">Bateria</SelectItem>
+            <SelectItem className="cursor-pointer" value="tire_change">Troca de Pneu</SelectItem>
+            <SelectItem className="cursor-pointer" value="locksmith">Chaveiro</SelectItem>
+            <SelectItem className="cursor-pointer" value="empty_tank">Tanque Vazio</SelectItem>
+            <SelectItem className="cursor-pointer" value="battery_charge_light">Carga de Bateria - Leve</SelectItem>
+            <SelectItem className="cursor-pointer" value="battery_charge_moto">Carga de Bateria - Moto</SelectItem>
+            <SelectItem className="cursor-pointer" value="towing_light">Reboque Leve</SelectItem>
+            <SelectItem className="cursor-pointer" value="towing_moto">Reboque Moto</SelectItem>
+            <SelectItem className="cursor-pointer" value="towing_heavy">Reboque Pesado</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {/* Filtro de Status */}
+        <Select value={statusFilter} onValueChange={(v) => applyFilter(setStatusFilter, v)}>
+          <SelectTrigger className="w-[220px] h-10 rounded-xl">
+            <SelectValue placeholder="Filtrar por Status" />
+          </SelectTrigger>
+          <SelectContent className="cursor-pointer max-h-[300px]">
+            <SelectItem className="cursor-pointer" value="todos">Todos os Status</SelectItem>
+            <SelectItem className="cursor-pointer" value="waiting_driver_accept">Aguardando aceite do motorista</SelectItem>
+            <SelectItem className="cursor-pointer" value="waiting_driver_access_app_after_call_accepted">Aguardando motorista acessar app</SelectItem>
+            <SelectItem className="cursor-pointer" value="waiting_arrival_to_checkin">Aguardando chegada para checkin</SelectItem>
+            <SelectItem className="cursor-pointer" value="in_checking">Em checkin</SelectItem>
+            <SelectItem className="cursor-pointer" value="waiting_arrival_to_checkout">Aguardando chegada para checkout</SelectItem>
+            <SelectItem className="cursor-pointer" value="in_checkout">Em checkout</SelectItem>
+            <SelectItem className="cursor-pointer" value="waiting_in_shed">Aguardando na garagem</SelectItem>
+            <SelectItem className="cursor-pointer" value="waiting_add_towing_delivery_call_trip">Aguardando adicionar viagem</SelectItem>
+            <SelectItem className="cursor-pointer" value="finished">Finalizado</SelectItem>
+            <SelectItem className="cursor-pointer" value="cancelled">Cancelado</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {/* Botão Limpar Filtros */}
+        {(serviceTypeFilter !== "todos" || associationFilter !== "todos" || statusFilter !== "todos" || searchTerm) && (
+          <Button
+            variant="outline"
+            className="h-10 rounded-xl gap-2"
+            onClick={() => {
+              setServiceTypeFilter("todos");
+              setAssociationFilter("todos");
+              setStatusFilter("todos");
+              setSearchTerm("");
+              setCurrentPage(1);
+            }}
+          >
+            <XCircle className="h-4 w-4" />
+            Limpar
+          </Button>
+        )}
+
+        {/* Ações */}
+        <div className="ml-auto flex gap-3">
+          <Button variant="outline" className="h-10 rounded-xl gap-2">
+            <Download className="h-4 w-4" />
+            Exportar
+          </Button>
+          <Button className="h-10 rounded-xl gap-2" onClick={() => setIsModalOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Novo Chamado
+          </Button>
+        </div>
+      </div>
+
+      {/* Info de Paginação */}
       {pagination && (
-        <div className="mb-6 flex items-center gap-3 flex-wrap">
-          {/* Tabs de Info */}
+        <div className="mb-6">
           <Tabs defaultValue="todos" className="mb-0">
             <TabsList className="bg-card border border-border/50 p-1 rounded-xl">
               <TabsTrigger value="todos" className="rounded-lg">
@@ -167,112 +243,24 @@ export default function Chamados() {
               </TabsTrigger>
             </TabsList>
           </Tabs>
-
-          {/* Filtro de Status */}
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[280px] h-10 rounded-xl">
-              <SelectValue placeholder="Filtrar por Status" />
-            </SelectTrigger>
-            <SelectContent className="cursor-pointer">
-              <SelectItem className="cursor-pointer" value="todos">Todos os Status</SelectItem>
-              <SelectItem className="cursor-pointer" value="waiting_driver_accept">Aguardando aceite do motorista</SelectItem>
-              <SelectItem className="cursor-pointer" value="waiting_driver_access_app_after_call_accepted">Aguardando motorista acessar app</SelectItem>
-              <SelectItem className="cursor-pointer" value="waiting_arrival_to_checkin">Aguardando chegada para checkin</SelectItem>
-              <SelectItem className="cursor-pointer" value="in_checking">Em checkin</SelectItem>
-              <SelectItem className="cursor-pointer" value="waiting_arrival_to_checkout">Aguardando chegada para checkout</SelectItem>
-              <SelectItem className="cursor-pointer" value="in_checkout">Em checkout</SelectItem>
-              <SelectItem className="cursor-pointer" value="waiting_in_shed">Aguardando na garagem</SelectItem>
-              <SelectItem className="cursor-pointer" value="waiting_add_towing_delivery_call_trip">Aguardando adicionar viagem</SelectItem>
-              <SelectItem className="cursor-pointer" value="finished">Finalizado</SelectItem>
-              <SelectItem className="cursor-pointer" value="cancelled">Cancelado</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Filtro de Tipo de Serviço */}
-          <Select value={serviceTypeFilter} onValueChange={setServiceTypeFilter}>
-            <SelectTrigger className="w-[220px] h-10 rounded-xl">
-              <SelectValue placeholder="Filtrar por Serviço" />
-            </SelectTrigger>
-            <SelectContent className="cursor-pointer max-h-[300px]">
-              <SelectItem className="cursor-pointer" value="todos">Todos os Serviços</SelectItem>
-              <SelectItem className="cursor-pointer" value="towing">Reboque</SelectItem>
-              <SelectItem className="cursor-pointer" value="towing_breakdown">Reboque com Falha</SelectItem>
-              <SelectItem className="cursor-pointer" value="battery">Bateria</SelectItem>
-              <SelectItem className="cursor-pointer" value="tire_change">Troca de Pneu</SelectItem>
-              <SelectItem className="cursor-pointer" value="locksmith">Chaveiro</SelectItem>
-              <SelectItem className="cursor-pointer" value="empty_tank">Tanque Vazio</SelectItem>
-              <SelectItem className="cursor-pointer" value="battery_charge_light">Carga de Bateria - Leve</SelectItem>
-              <SelectItem className="cursor-pointer" value="battery_charge_moto">Carga de Bateria - Moto</SelectItem>
-              <SelectItem className="cursor-pointer" value="towing_light">Reboque Leve</SelectItem>
-              <SelectItem className="cursor-pointer" value="towing_moto">Reboque Moto</SelectItem>
-              <SelectItem className="cursor-pointer" value="towing_heavy">Reboque Pesado</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Filtro de Associação */}
-          <Select value={associationFilter} onValueChange={setAssociationFilter}>
-            <SelectTrigger className="w-[180px] h-10 rounded-xl">
-              <SelectValue placeholder="Filtrar por Cliente" />
-            </SelectTrigger>
-            <SelectContent className="cursor-pointer">
-              <SelectItem className="cursor-pointer" value="todos">Todos os Clientes</SelectItem>
-              <SelectItem className="cursor-pointer" value="solidy">Solidy</SelectItem>
-              <SelectItem className="cursor-pointer" value="motoclub">Motoclub</SelectItem>
-              <SelectItem className="cursor-pointer" value="aprovel">AAPROVEL</SelectItem>
-              <SelectItem className="cursor-pointer" value="nova">Nova</SelectItem>
-              <SelectItem className="cursor-pointer" value="agsmb">Agsmb</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Botão Limpar Filtros */}
-          {(statusFilter !== "todos" || serviceTypeFilter !== "todos" || associationFilter !== "todos" || searchTerm) && (
-            <Button
-              variant="outline"
-              className="h-10 rounded-xl gap-2"
-              onClick={() => {
-                setStatusFilter("todos");
-                setServiceTypeFilter("todos");
-                setAssociationFilter("todos");
-                setSearchTerm("");
-              }}
-            >
-              <XCircle className="h-4 w-4" />
-              Limpar
-            </Button>
-          )}
-
-          {/* Ações */}
-          <div className="ml-auto flex gap-3">
-            <Button variant="outline" className="h-10 rounded-xl gap-2">
-              <Download className="h-4 w-4" />
-              Exportar
-            </Button>
-            <Button className="h-10 rounded-xl gap-2" onClick={() => setIsModalOpen(true)}>
-              <Plus className="h-4 w-4" />
-              Novo Chamado
-            </Button>
-          </div>
         </div>
       )}
 
       {/* Modal de Novo Chamado */}
-      <ChamadoFormModal open={isModalOpen} onOpenChange={setIsModalOpen} />
+      <ChamadoFormModal
+        open={isModalOpen}
+        onOpenChange={setIsModalOpen}
+        onSuccess={handleChamadoCreated}
+      />
 
       {/* Tabela Principal */}
       <Card className="rounded-2xl border-border/50 shadow-soft">
         <CardHeader className="pb-4">
           <CardTitle className="text-lg">Lista de Chamados</CardTitle>
           <CardDescription>
-            {pagination && (
-              <>
-                {chamadosFiltrados.length < chamados.length ? (
-                  `Mostrando ${chamadosFiltrados.length} de ${chamados.length} chamados (filtrados)`
-                ) : (
-                  `Exibindo ${pagination.from} - ${pagination.to} de ${pagination.total} chamados`
-                )}
-              </>
-            )}
-            {!pagination && 'Visualize e gerencie os chamados de assistência'}
+            {pagination
+              ? `Exibindo ${pagination.from} a ${pagination.to} de ${pagination.total} chamados`
+              : 'Visualize e gerencie os chamados de assistência'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -301,20 +289,18 @@ export default function Chamados() {
           )}
 
           {/* Empty State */}
-          {!loading && !error && chamadosFiltrados.length === 0 && (
+          {!loading && !error && chamados.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold mb-2">Nenhum chamado encontrado</h3>
               <p className="text-sm text-muted-foreground">
-                {chamados.length === 0
-                  ? "Não há chamados disponíveis no momento"
-                  : "Nenhum chamado corresponde aos filtros selecionados"}
+                Nenhum chamado corresponde aos filtros ou à busca.
               </p>
             </div>
           )}
 
           {/* Table with Data */}
-          {!loading && !error && chamadosFiltrados.length > 0 && (
+          {!loading && !error && chamados.length > 0 && (
             <>
               <Table>
                 <TableHeader>
@@ -331,7 +317,7 @@ export default function Chamados() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {chamadosFiltrados.map((chamado) => {
+                  {chamados.map((chamado) => {
                     const statusVariant = chamado.towing_status
                       ? callTowingStatusVariants[chamado.towing_status] || "secondary"
                       : "secondary";

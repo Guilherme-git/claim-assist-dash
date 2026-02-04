@@ -36,6 +36,9 @@
     --warning: 38 96% 56%;
     --warning-foreground: 0 0% 0%;
 
+    --info: 195 85% 45%;
+    --info-foreground: 0 0% 100%;
+
     --border: 140 6% 90%;
     --input: 140 6% 90%;
     --ring: 160 100% 22%;
@@ -91,6 +94,9 @@
 
     --warning: 38 96% 60%;
     --warning-foreground: 0 0% 0%;
+
+    --info: 195 85% 50%;
+    --info-foreground: 0 0% 100%;
 
     --border: 160 20% 16%;
     --input: 160 20% 16%;
@@ -230,5 +236,20 @@
   @keyframes glow {
     from { box-shadow: 0 0 20px -10px hsl(160 100% 22% / 0.4); }
     to { box-shadow: 0 0 30px -10px hsl(160 100% 22% / 0.6); }
+  }
+
+  /* Google Maps Autocomplete dropdown z-index fix for modals */
+  .pac-container {
+    z-index: 9999 !important;
+    position: fixed !important;
+  }
+
+  /* Permitir clicks no dropdown do autocomplete */
+  .pac-container * {
+    pointer-events: auto !important;
+  }
+
+  .pac-item {
+    cursor: pointer !important;
   }
 }

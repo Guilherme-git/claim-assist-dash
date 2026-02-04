@@ -5,4 +5,7 @@ services:
     build: .
     ports:
       - "8081:8081"
+    environment:
+      VITE_API_URL: ${VITE_API_URL}
+      VITE_GOOGLE_MAPS_API_KEY: ${VITE_GOOGLE_MAPS_API_KEY}
     restart: unless-stopped

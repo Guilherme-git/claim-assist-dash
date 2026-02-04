@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -37,53 +36,30 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import {
   Phone,
   User,
-  Car,
   MapPin,
   Wrench,
   Navigation,
-  ChevronDown,
-  ChevronUp,
-  Plus,
   Search,
   Check,
   Loader2,
   AlertCircle,
 } from "lucide-react";
-import InputMask from "react-input-mask";
 import { GoogleMap, useJsApiLoader, Marker, Autocomplete } from "@react-google-maps/api";
+import { callsService, ILevaAssociate, ILevaVehicle } from "@/services/calls.service";
 
 // Schema de validação
 const chamadoSchema = z.object({
   association: z.enum(["solidy", "motoclub", "nova", "aprovel"], {
     required_error: "Selecione uma associação",
   }),
-  associate_id: z.string().optional(),
-  associate_vehicle_id: z.string().optional(),
-  createNewAssociate: z.boolean().default(false),
-  newAssociate: z.object({
-    name: z.string().optional(),
-    phone: z.string().optional(),
-    cpf: z.string().optional(),
-    car: z.object({
-      category: z.string().optional(),
-      plate: z.string().optional(),
-      brand: z.string().optional(),
-      model: z.string().optional(),
-      color: z.string().optional(),
-      year: z.string().optional(),
-    }).optional(),
-  }).optional(),
+  associate_id: z.string().min(1, "Selecione um associado"),
+  associate_vehicle_id: z.string().min(1, "Selecione um veículo"),
   observation: z.string().optional(),
   address: z.string().min(10, "Endereço deve ter pelo menos 10 caracteres"),
   location: z.object({
@@ -91,9 +67,8 @@ const chamadoSchema = z.object({
     lng: z.number(),
   }),
   google_maps_link: z.string().optional(),
-  is_to_search_partner: z.boolean().default(false),
-  will_use_tow_truck: z.boolean().default(false),
-  towing_service_type: z.string().optional(),
+  will_use_tow_truck: z.boolean().default(true),
+  towing_service_type: z.string().min(1, "Selecione o tipo de serviço"),
   destination: z.object({
     address: z.string().optional(),
     location: z.object({
@@ -102,31 +77,6 @@ const chamadoSchema = z.object({
     }).optional(),
     google_maps_link: z.string().optional(),
   }).optional(),
-}).refine((data) => {
-  if (!data.createNewAssociate) {
-    return !!data.associate_id && !!data.associate_vehicle_id;
-  }
-  return true;
-}, {
-  message: "Selecione um associado e veículo ou crie um novo",
-  path: ["associate_id"],
-}).refine((data) => {
-  if (data.createNewAssociate && data.newAssociate) {
-    const { name, phone, cpf, car } = data.newAssociate;
-    return !!name && !!phone && !!cpf && !!car?.category && !!car?.plate && !!car?.brand && !!car?.model && !!car?.color && !!car?.year;
-  }
-  return true;
-}, {
-  message: "Preencha todos os campos do novo associado",
-  path: ["newAssociate"],
-}).refine((data) => {
-  if (data.will_use_tow_truck) {
-    return !!data.towing_service_type;
-  }
-  return true;
-}, {
-  message: "Selecione o tipo de serviço",
-  path: ["towing_service_type"],
 });
 
 type ChamadoFormData = z.infer<typeof chamadoSchema>;
@@ -187,25 +137,6 @@ const associations = [
   { value: "aprovel", label: "AAPROVEL" },
 ];
 
-const mockAssociates = [
-  { id: "1", name: "João Silva", phone: "(11) 98765-4321", cpf: "123.456.789-00" },
-  { id: "2", name: "Maria Santos", phone: "(11) 91234-5678", cpf: "987.654.321-00" },
-  { id: "3", name: "Pedro Oliveira", phone: "(21) 99876-5432", cpf: "456.789.123-00" },
-];
-
-const mockVehicles: Record<string, Array<{ id: string; plate: string; model: string; brand: string }>> = {
-  "1": [
-    { id: "v1", plate: "ABC1D23", model: "Corolla", brand: "Toyota" },
-    { id: "v2", plate: "XYZ9W87", model: "Civic", brand: "Honda" },
-  ],
-  "2": [
-    { id: "v3", plate: "DEF4G56", model: "Onix", brand: "Chevrolet" },
-  ],
-  "3": [
-    { id: "v4", plate: "GHI7J89", model: "HB20", brand: "Hyundai" },
-  ],
-};
-
 const libraries: ("places")[] = ["places"];
 const mapContainerStyle = { width: "100%", height: "250px" };
 const defaultCenter = { lat: -15.7801, lng: -47.9292 };
@@ -215,6 +146,18 @@ function isTowingService(type: string | undefined): boolean {
   return type.startsWith("towing");
 }
 
+function formatCPF(cpf: string): string {
+  // Remove caracteres não numéricos
+  const cleaned = cpf.replace(/\D/g, "");
+
+  // Aplica a máscara xxx.xxx.xxx-xx
+  if (cleaned.length === 11) {
+    return cleaned.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+  }
+
+  return cpf; // Retorna original se não tiver 11 dígitos
+}
+
 interface ChamadoFormModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -222,20 +165,30 @@ interface ChamadoFormModalProps {
 }
 
 export function ChamadoFormModal({ open, onOpenChange, onSuccess }: ChamadoFormModalProps) {
-  const [isNewAssociateOpen, setIsNewAssociateOpen] = useState(false);
   const [associateSearchOpen, setAssociateSearchOpen] = useState(false);
-  const [selectedAssociate, setSelectedAssociate] = useState<typeof mockAssociates[0] | null>(null);
+  const [selectedAssociate, setSelectedAssociate] = useState<ILevaAssociate | null>(null);
   const [selectedVehicle, setSelectedVehicle] = useState<string>("");
+  const [associates, setAssociates] = useState<ILevaAssociate[]>([]);
+  const [isSearchingAssociates, setIsSearchingAssociates] = useState(false);
+  const [associateSearchQuery, setAssociateSearchQuery] = useState("");
   const [originMarker, setOriginMarker] = useState(defaultCenter);
   const [destinationMarker, setDestinationMarker] = useState(defaultCenter);
   const [originAutocomplete, setOriginAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
   const [destinationAutocomplete, setDestinationAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showLocationPermission, setShowLocationPermission] = useState(false);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [isSearchingAddress, setIsSearchingAddress] = useState(false);
 
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
     libraries,
   });
+
+  // Opções do Autocomplete para garantir que o dropdown apareça acima de tudo
+  const autocompleteOptions = {
+    fields: ["formatted_address", "geometry", "name"],
+  };
 
   const form = useForm<ChamadoFormData>({
     resolver: zodResolver(chamadoSchema),
@@ -243,26 +196,11 @@ export function ChamadoFormModal({ open, onOpenChange, onSuccess }: ChamadoFormM
       association: undefined,
       associate_id: "",
       associate_vehicle_id: "",
-      createNewAssociate: false,
-      newAssociate: {
-        name: "",
-        phone: "",
-        cpf: "",
-        car: {
-          category: "",
-          plate: "",
-          brand: "",
-          model: "",
-          color: "",
-          year: "",
-        },
-      },
       observation: "",
       address: "",
       location: defaultCenter,
       google_maps_link: "",
-      is_to_search_partner: false,
-      will_use_tow_truck: false,
+      will_use_tow_truck: true,
       towing_service_type: "",
       destination: {
         address: "",
@@ -273,9 +211,7 @@ export function ChamadoFormModal({ open, onOpenChange, onSuccess }: ChamadoFormM
   });
 
   const { watch, setValue, control, handleSubmit, formState: { errors }, reset } = form;
-  const watchWillUseTowTruck = watch("will_use_tow_truck");
   const watchTowingServiceType = watch("towing_service_type");
-  const watchCreateNewAssociate = watch("createNewAssociate");
 
   const showDestination = isTowingService(watchTowingServiceType);
 
@@ -331,9 +267,16 @@ export function ChamadoFormModal({ open, onOpenChange, onSuccess }: ChamadoFormM
       if (place.geometry?.location) {
         const lat = place.geometry.location.lat();
         const lng = place.geometry.location.lng();
-        setValue("location", { lat, lng });
+        const newLocation = { lat, lng };
+
+        setValue("location", newLocation);
         setValue("address", place.formatted_address || "");
-        setOriginMarker({ lat, lng });
+        setOriginMarker(newLocation);
+
+        toast({
+          title: "Localização atualizada",
+          description: place.formatted_address || "Endereço selecionado",
+        });
       }
     }
   }, [originAutocomplete, setValue]);
@@ -344,9 +287,16 @@ export function ChamadoFormModal({ open, onOpenChange, onSuccess }: ChamadoFormM
       if (place.geometry?.location) {
         const lat = place.geometry.location.lat();
         const lng = place.geometry.location.lng();
-        setValue("destination.location", { lat, lng });
+        const newLocation = { lat, lng };
+
+        setValue("destination.location", newLocation);
         setValue("destination.address", place.formatted_address || "");
-        setDestinationMarker({ lat, lng });
+        setDestinationMarker(newLocation);
+
+        toast({
+          title: "Destino atualizado",
+          description: place.formatted_address || "Endereço de destino selecionado",
+        });
       }
     }
   }, [destinationAutocomplete, setValue]);
@@ -390,73 +340,396 @@ export function ChamadoFormModal({ open, onOpenChange, onSuccess }: ChamadoFormM
   const onSubmit = async (data: ChamadoFormData) => {
     setIsSubmitting(true);
     try {
-      const payload: Record<string, unknown> = {
-        association: data.association,
+      const payload: any = {
+        associate_car_id: parseInt(data.associate_vehicle_id),
         address: data.address,
-        location: data.location,
-        observation: data.observation,
-        is_to_search_partner: data.is_to_search_partner,
-        will_use_tow_truck: data.will_use_tow_truck,
+        association: data.association,
+        towing_service_type: data.towing_service_type,
+        observation: data.observation || undefined,
+        location: {
+          latitude: data.location.lat,
+          longitude: data.location.lng,
+        },
+        uf_id: 1, // TODO: Obter do endereço ou formulário
+        city_id: 1, // TODO: Obter do endereço ou formulário
       };
 
-      if (data.createNewAssociate && data.newAssociate) {
-        payload.create_associate = {
-          name: data.newAssociate.name,
-          phone: data.newAssociate.phone?.replace(/\D/g, ""),
-          cpf: data.newAssociate.cpf?.replace(/\D/g, ""),
-          car: data.newAssociate.car,
-        };
-      } else {
-        payload.associate_car_id = data.associate_vehicle_id;
-      }
-
-      if (data.will_use_tow_truck) {
-        payload.towing_service_type = data.towing_service_type;
-      }
-
-      if (showDestination && data.destination) {
+      if (showDestination && data.destination?.location) {
         payload.destination = {
           address: data.destination.address,
-          location: data.destination.location,
+          location: {
+            latitude: data.destination.location.lat,
+            longitude: data.destination.location.lng,
+          },
         };
       }
 
-      console.log("Payload:", payload);
-      
+      const createdCall = await callsService.createTowingCall(payload);
+
       toast({
         title: "Chamado criado com sucesso!",
-        description: "O chamado foi registrado no sistema.",
+        description: `Chamado #${createdCall.id} foi registrado no sistema.`,
       });
-      
+
       reset();
+      setSelectedAssociate(null);
+      setSelectedVehicle("");
+      setAssociates([]);
+      setAssociateSearchQuery("");
       onOpenChange(false);
       onSuccess?.();
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
       toast({
         variant: "destructive",
         title: "Erro ao criar chamado",
-        description: "Tente novamente mais tarde.",
+        description: error?.response?.data?.message || "Tente novamente mais tarde.",
       });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const availableVehicles = selectedAssociate ? mockVehicles[selectedAssociate.id] || [] : [];
+  const availableVehicles = selectedAssociate?.vehicles || [];
 
-  useEffect(() => {
-    if (watchCreateNewAssociate) {
-      setSelectedAssociate(null);
-      setSelectedVehicle("");
-      setValue("associate_id", "");
-      setValue("associate_vehicle_id", "");
+  // Função para obter localização do usuário
+  const getUserLocation = useCallback(() => {
+    if (!navigator.geolocation) {
+      toast({
+        variant: "destructive",
+        title: "Geolocalização não suportada",
+        description: "Seu navegador não suporta geolocalização.",
+      });
+      setShowLocationPermission(false);
+      return;
     }
-  }, [watchCreateNewAssociate, setValue]);
+
+    setIsGettingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        const userLocation = { lat: latitude, lng: longitude };
+
+        setOriginMarker(userLocation);
+        setDestinationMarker(userLocation);
+        setValue("location", userLocation);
+
+        toast({
+          title: "Localização obtida!",
+          description: `Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)}`,
+        });
+
+        setIsGettingLocation(false);
+        setShowLocationPermission(false);
+      },
+      (error) => {
+        console.error("Erro ao obter localização:", error);
+        toast({
+          variant: "destructive",
+          title: "Erro ao obter localização",
+          description: error.code === 1
+            ? "Você negou a permissão de localização."
+            : "Não foi possível obter sua localização.",
+        });
+        setIsGettingLocation(false);
+        setShowLocationPermission(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      }
+    );
+  }, [setValue]);
+
+  // Verificar se usuário já aceitou localização antes
+  useEffect(() => {
+    if (open) {
+      const locationPreference = localStorage.getItem("location_permission");
+
+      if (locationPreference === "allowed") {
+        // Já aceitou antes, obter localização automaticamente
+        getUserLocation();
+      } else if (locationPreference === "denied") {
+        // Já negou antes, não mostrar modal
+        setShowLocationPermission(false);
+      } else {
+        // Primeira vez, mostrar modal
+        setShowLocationPermission(true);
+      }
+    } else {
+      setShowLocationPermission(false);
+    }
+  }, [open, getUserLocation]);
+
+  // Buscar associados conforme o usuário digita (com debounce)
+  useEffect(() => {
+    const association = watch("association");
+
+    if (!associateSearchQuery || associateSearchQuery.trim().length < 2 || !association) {
+      setAssociates([]);
+      return;
+    }
+
+    setIsSearchingAssociates(true);
+
+    const timer = setTimeout(async () => {
+      try {
+        const response = await callsService.searchAssociates(associateSearchQuery.trim(), association);
+        setAssociates(response.data);
+      } catch (error) {
+        console.error("Erro ao buscar associados:", error);
+        toast({
+          variant: "destructive",
+          title: "Erro ao buscar associados",
+          description: "Tente novamente.",
+        });
+        setAssociates([]);
+      } finally {
+        setIsSearchingAssociates(false);
+      }
+    }, 500); // Debounce de 500ms
+
+    return () => clearTimeout(timer);
+  }, [associateSearchQuery, watch]);
+
+  // Fix para permitir clicks no dropdown do Google Maps Autocomplete
+  useEffect(() => {
+    if (!open || !isLoaded) return;
+
+    const handlePacContainerClick = (e: MouseEvent) => {
+      e.stopPropagation();
+    };
+
+    // Aguardar um pouco para o dropdown ser criado
+    const timer = setTimeout(() => {
+      const pacContainers = document.querySelectorAll('.pac-container');
+      pacContainers.forEach((container) => {
+        container.addEventListener('click', handlePacContainerClick, true);
+        container.addEventListener('mousedown', handlePacContainerClick, true);
+      });
+    }, 100);
+
+    return () => {
+      clearTimeout(timer);
+      const pacContainers = document.querySelectorAll('.pac-container');
+      pacContainers.forEach((container) => {
+        container.removeEventListener('click', handlePacContainerClick, true);
+        container.removeEventListener('mousedown', handlePacContainerClick, true);
+      });
+    };
+  }, [open, isLoaded]);
+
+  const handleAllowLocation = () => {
+    // Salvar preferência no localStorage
+    localStorage.setItem("location_permission", "allowed");
+    getUserLocation();
+  };
+
+  const handleDenyLocation = () => {
+    // Salvar preferência no localStorage
+    localStorage.setItem("location_permission", "denied");
+    setShowLocationPermission(false);
+    toast({
+      title: "Localização não permitida",
+      description: "Você pode inserir o endereço manualmente.",
+    });
+  };
+
+  const handleSearchAddress = async () => {
+    const address = watch("address");
+
+    if (!address || address.trim().length < 5) {
+      toast({
+        variant: "destructive",
+        title: "Endereço inválido",
+        description: "Digite um endereço válido para buscar.",
+      });
+      return;
+    }
+
+    if (!isLoaded) {
+      toast({
+        variant: "destructive",
+        title: "Google Maps não carregado",
+        description: "Aguarde o carregamento do mapa.",
+      });
+      return;
+    }
+
+    setIsSearchingAddress(true);
+
+    try {
+      const geocoder = new google.maps.Geocoder();
+
+      geocoder.geocode({ address }, (results, status) => {
+        setIsSearchingAddress(false);
+
+        if (status === "OK" && results && results[0]) {
+          const location = results[0].geometry.location;
+          const lat = location.lat();
+          const lng = location.lng();
+          const userLocation = { lat, lng };
+
+          setOriginMarker(userLocation);
+          setValue("location", userLocation);
+          setValue("address", results[0].formatted_address || address);
+
+          toast({
+            title: "Endereço encontrado!",
+            description: `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`,
+          });
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Endereço não encontrado",
+            description: "Não foi possível encontrar este endereço. Tente ser mais específico.",
+          });
+        }
+      });
+    } catch (error) {
+      setIsSearchingAddress(false);
+      console.error("Erro ao buscar endereço:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro na busca",
+        description: "Ocorreu um erro ao buscar o endereço.",
+      });
+    }
+  };
+
+  const handleSearchDestinationAddress = async () => {
+    const address = watch("destination.address");
+
+    if (!address || address.trim().length < 5) {
+      toast({
+        variant: "destructive",
+        title: "Endereço inválido",
+        description: "Digite um endereço válido para buscar.",
+      });
+      return;
+    }
+
+    if (!isLoaded) {
+      toast({
+        variant: "destructive",
+        title: "Google Maps não carregado",
+        description: "Aguarde o carregamento do mapa.",
+      });
+      return;
+    }
+
+    setIsSearchingAddress(true);
+
+    try {
+      const geocoder = new google.maps.Geocoder();
+
+      geocoder.geocode({ address }, (results, status) => {
+        setIsSearchingAddress(false);
+
+        if (status === "OK" && results && results[0]) {
+          const location = results[0].geometry.location;
+          const lat = location.lat();
+          const lng = location.lng();
+          const userLocation = { lat, lng };
+
+          setDestinationMarker(userLocation);
+          setValue("destination.location", userLocation);
+          setValue("destination.address", results[0].formatted_address || address);
+
+          toast({
+            title: "Endereço de destino encontrado!",
+            description: `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`,
+          });
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Endereço não encontrado",
+            description: "Não foi possível encontrar este endereço. Tente ser mais específico.",
+          });
+        }
+      });
+    } catch (error) {
+      setIsSearchingAddress(false);
+      console.error("Erro ao buscar endereço:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro na busca",
+        description: "Ocorreu um erro ao buscar o endereço.",
+      });
+    }
+  };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+    <>
+      {/* Modal de Permissão de Localização */}
+      <Dialog open={showLocationPermission} onOpenChange={setShowLocationPermission}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-primary" />
+              Permitir Acesso à Localização
+            </DialogTitle>
+            <DialogDescription>
+              Permitir que o sistema acesse sua localização atual para facilitar o cadastro do chamado?
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 pt-4">
+            <div className="rounded-lg border bg-muted/30 p-4">
+              <div className="flex items-start gap-3">
+                <Navigation className="h-5 w-5 text-primary mt-0.5" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Por que precisamos disso?</p>
+                  <p className="text-sm text-muted-foreground">
+                    Sua localização será usada para centralizar o mapa no local de origem do chamado,
+                    facilitando a seleção do endereço correto.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={handleDenyLocation}
+                disabled={isGettingLocation}
+              >
+                Não Permitir
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={handleAllowLocation}
+                disabled={isGettingLocation}
+              >
+                {isGettingLocation && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Permitir Localização
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Principal de Cadastro */}
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent
+          className="max-w-4xl max-h-[90vh] p-0"
+          onInteractOutside={(e) => {
+            const target = e.target as HTMLElement;
+            // Prevenir fechamento ao clicar no dropdown do autocomplete
+            if (target.closest('.pac-container') || target.classList.contains('pac-item') || target.classList.contains('pac-item-query')) {
+              e.preventDefault();
+            }
+          }}
+          onEscapeKeyDown={(e) => {
+            // Permitir ESC apenas se não houver dropdown aberto
+            const pacContainer = document.querySelector('.pac-container');
+            if (pacContainer && window.getComputedStyle(pacContainer).display !== 'none') {
+              e.preventDefault();
+            }
+          }}
+        >
         <DialogHeader className="px-6 pt-6 pb-4 border-b">
           <DialogTitle className="flex items-center gap-2">
             <Phone className="h-5 w-5 text-primary" />
@@ -504,31 +777,7 @@ export function ChamadoFormModal({ open, onOpenChange, onSuccess }: ChamadoFormM
                 )}
               </div>
 
-              {/* Toggle criar novo */}
-              <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/30">
-                <div className="space-y-0.5">
-                  <Label className="text-sm font-medium">Criar novo associado?</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Ative para cadastrar um novo associado e veículo
-                  </p>
-                </div>
-                <Controller
-                  control={control}
-                  name="createNewAssociate"
-                  render={({ field }) => (
-                    <Switch
-                      checked={field.value}
-                      onCheckedChange={(checked) => {
-                        field.onChange(checked);
-                        setIsNewAssociateOpen(checked);
-                      }}
-                    />
-                  )}
-                />
-              </div>
-
               {/* Buscar associado existente */}
-              {!watchCreateNewAssociate && (
                 <div className="grid gap-4 md:grid-cols-2">
                   {/* Associado */}
                   <div className="space-y-2">
@@ -544,27 +793,43 @@ export function ChamadoFormModal({ open, onOpenChange, onSuccess }: ChamadoFormM
                             "w-full justify-between",
                             !selectedAssociate && "text-muted-foreground"
                           )}
+                          disabled={!watch("association")}
                         >
-                          {selectedAssociate ? selectedAssociate.name : "Buscar associado..."}
-                          <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          {selectedAssociate ? selectedAssociate.nome : watch("association") ? "Buscar associado..." : "Selecione uma associação primeiro"}
+                          {isSearchingAssociates ? (
+                            <Loader2 className="ml-2 h-4 w-4 shrink-0 animate-spin" />
+                          ) : (
+                            <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          )}
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-full p-0" align="start">
-                        <Command>
-                          <CommandInput placeholder="Buscar por nome..." />
+                        <Command shouldFilter={false}>
+                          <CommandInput
+                            placeholder="Buscar por nome..."
+                            value={associateSearchQuery}
+                            onValueChange={setAssociateSearchQuery}
+                          />
                           <CommandList>
-                            <CommandEmpty>Nenhum associado encontrado.</CommandEmpty>
+                            <CommandEmpty>
+                              {associateSearchQuery.length < 2
+                                ? "Digite pelo menos 2 caracteres para buscar"
+                                : isSearchingAssociates
+                                  ? "Buscando..."
+                                  : "Nenhum associado encontrado."}
+                            </CommandEmpty>
                             <CommandGroup>
-                              {mockAssociates.map((associate) => (
+                              {associates.map((associate) => (
                                 <CommandItem
                                   key={associate.id}
-                                  value={associate.name}
+                                  value={associate.nome}
                                   onSelect={() => {
                                     setSelectedAssociate(associate);
-                                    setValue("associate_id", associate.id);
+                                    setValue("associate_id", String(associate.id));
                                     setSelectedVehicle("");
                                     setValue("associate_vehicle_id", "");
                                     setAssociateSearchOpen(false);
+                                    setAssociateSearchQuery("");
                                   }}
                                 >
                                   <Check
@@ -576,9 +841,9 @@ export function ChamadoFormModal({ open, onOpenChange, onSuccess }: ChamadoFormM
                                     )}
                                   />
                                   <div>
-                                    <p className="font-medium">{associate.name}</p>
+                                    <p className="font-medium">{associate.nome}</p>
                                     <p className="text-xs text-muted-foreground">
-                                      {associate.phone} • {associate.cpf}
+                                      {formatCPF(associate.cpf)}
                                     </p>
                                   </div>
                                 </CommandItem>
@@ -611,10 +876,10 @@ export function ChamadoFormModal({ open, onOpenChange, onSuccess }: ChamadoFormM
                       </SelectTrigger>
                       <SelectContent>
                         {availableVehicles.map((vehicle) => (
-                          <SelectItem key={vehicle.id} value={vehicle.id}>
-                            <span className="font-medium">{vehicle.plate}</span>
+                          <SelectItem key={vehicle.id} value={String(vehicle.id)}>
+                            <span className="font-medium">{vehicle.placa}</span>
                             <span className="text-muted-foreground ml-2">
-                              {vehicle.brand} {vehicle.model}
+                              {vehicle.marca} {vehicle.modelo}
                             </span>
                           </SelectItem>
                         ))}
@@ -622,153 +887,31 @@ export function ChamadoFormModal({ open, onOpenChange, onSuccess }: ChamadoFormM
                     </Select>
                   </div>
                 </div>
-              )}
-
-              {/* Cadastro novo associado */}
-              <Collapsible open={isNewAssociateOpen && watchCreateNewAssociate}>
-                <CollapsibleContent className="space-y-4 pt-4 border-t">
-                  <h4 className="font-medium flex items-center gap-2 text-sm">
-                    <Plus className="h-4 w-4" />
-                    Dados do Novo Associado
-                  </h4>
-                  
-                  <div className="grid gap-4 md:grid-cols-3">
-                    <div className="space-y-2">
-                      <Label>Nome Completo <span className="text-destructive">*</span></Label>
-                      <Controller
-                        control={control}
-                        name="newAssociate.name"
-                        render={({ field }) => (
-                          <Input {...field} placeholder="João da Silva" />
-                        )}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Telefone <span className="text-destructive">*</span></Label>
-                      <Controller
-                        control={control}
-                        name="newAssociate.phone"
-                        render={({ field }) => (
-                          <InputMask
-                            mask="(99) 99999-9999"
-                            value={field.value}
-                            onChange={field.onChange}
-                          >
-                            {(inputProps: any) => (
-                              <Input {...inputProps} placeholder="(11) 98765-4321" />
-                            )}
-                          </InputMask>
-                        )}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>CPF <span className="text-destructive">*</span></Label>
-                      <Controller
-                        control={control}
-                        name="newAssociate.cpf"
-                        render={({ field }) => (
-                          <InputMask
-                            mask="999.999.999-99"
-                            value={field.value}
-                            onChange={field.onChange}
-                          >
-                            {(inputProps: any) => (
-                              <Input {...inputProps} placeholder="123.456.789-00" />
-                            )}
-                          </InputMask>
-                        )}
-                      />
-                    </div>
-                  </div>
-
-                  <h4 className="font-medium flex items-center gap-2 text-sm pt-2">
-                    <Car className="h-4 w-4" />
-                    Dados do Veículo
-                  </h4>
-
-                  <div className="grid gap-4 md:grid-cols-3">
-                    <div className="space-y-2">
-                      <Label>Categoria <span className="text-destructive">*</span></Label>
-                      <Controller
-                        control={control}
-                        name="newAssociate.car.category"
-                        render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {vehicleCategories.map((cat) => (
-                                <SelectItem key={cat.value} value={cat.value}>
-                                  {cat.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Placa <span className="text-destructive">*</span></Label>
-                      <Controller
-                        control={control}
-                        name="newAssociate.car.plate"
-                        render={({ field }) => (
-                          <Input {...field} placeholder="ABC1D23" maxLength={7} className="uppercase" />
-                        )}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Ano <span className="text-destructive">*</span></Label>
-                      <Controller
-                        control={control}
-                        name="newAssociate.car.year"
-                        render={({ field }) => (
-                          <Input {...field} placeholder="2024" maxLength={4} />
-                        )}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Marca <span className="text-destructive">*</span></Label>
-                      <Controller
-                        control={control}
-                        name="newAssociate.car.brand"
-                        render={({ field }) => (
-                          <Input {...field} placeholder="Toyota" />
-                        )}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Modelo <span className="text-destructive">*</span></Label>
-                      <Controller
-                        control={control}
-                        name="newAssociate.car.model"
-                        render={({ field }) => (
-                          <Input {...field} placeholder="Corolla" />
-                        )}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Cor <span className="text-destructive">*</span></Label>
-                      <Controller
-                        control={control}
-                        name="newAssociate.car.color"
-                        render={({ field }) => (
-                          <Input {...field} placeholder="Preto" />
-                        )}
-                      />
-                    </div>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
             </div>
 
             {/* SEÇÃO 2: LOCALIZAÇÃO DE ORIGEM */}
             <div className="space-y-4 pt-4 border-t">
-              <h3 className="font-semibold flex items-center gap-2 text-base">
-                <MapPin className="h-4 w-4 text-primary" />
-                Localização de Origem
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold flex items-center gap-2 text-base">
+                  <MapPin className="h-4 w-4 text-primary" />
+                  Localização de Origem
+                </h3>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs gap-1.5"
+                  onClick={getUserLocation}
+                  disabled={isGettingLocation}
+                >
+                  {isGettingLocation ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Navigation className="h-3 w-3" />
+                  )}
+                  Usar Minha Localização
+                </Button>
+              </div>
 
               <div className="space-y-2">
                 <Label>Observação</Label>
@@ -785,28 +928,37 @@ export function ChamadoFormModal({ open, onOpenChange, onSuccess }: ChamadoFormM
                 />
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>
-                    Endereço de Origem <span className="text-destructive">*</span>
-                  </Label>
+              <div className="space-y-2">
+                <Label>
+                  Endereço de Origem <span className="text-destructive">*</span>
+                </Label>
+                <div className="flex gap-2">
                   {isLoaded ? (
-                    <Autocomplete
-                      onLoad={setOriginAutocomplete}
-                      onPlaceChanged={onOriginPlaceChanged}
-                    >
-                      <Controller
-                        control={control}
-                        name="address"
-                        render={({ field }) => (
-                          <Input
-                            {...field}
-                            placeholder="Digite o endereço completo"
-                            className={cn(errors.address && "border-destructive")}
-                          />
-                        )}
-                      />
-                    </Autocomplete>
+                    <div className="flex-1">
+                      <Autocomplete
+                        onLoad={setOriginAutocomplete}
+                        onPlaceChanged={onOriginPlaceChanged}
+                        options={autocompleteOptions}
+                      >
+                        <Controller
+                          control={control}
+                          name="address"
+                          render={({ field }) => (
+                            <Input
+                              {...field}
+                              placeholder="Digite o endereço completo"
+                              className={cn(errors.address && "border-destructive")}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleSearchAddress();
+                                }
+                              }}
+                            />
+                          )}
+                        />
+                      </Autocomplete>
+                    </div>
                   ) : (
                     <Controller
                       control={control}
@@ -815,26 +967,35 @@ export function ChamadoFormModal({ open, onOpenChange, onSuccess }: ChamadoFormM
                         <Input
                           {...field}
                           placeholder="Digite o endereço completo"
-                          className={cn(errors.address && "border-destructive")}
+                          className={cn(errors.address && "border-destructive", "flex-1")}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleSearchAddress();
+                            }
+                          }}
                         />
                       )}
                     />
                   )}
-                  {errors.address && (
-                    <p className="text-sm text-destructive">{errors.address.message}</p>
-                  )}
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="icon"
+                    className="shrink-0"
+                    onClick={handleSearchAddress}
+                    disabled={isSearchingAddress || !isLoaded}
+                  >
+                    {isSearchingAddress ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Search className="h-4 w-4" />
+                    )}
+                  </Button>
                 </div>
-
-                <div className="space-y-2">
-                  <Label>Link do Google Maps (opcional)</Label>
-                  <Input
-                    placeholder="https://maps.google.com/..."
-                    onChange={(e) => handleOriginLinkChange(e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Cole um link para extrair coordenadas automaticamente
-                  </p>
-                </div>
+                {errors.address && (
+                  <p className="text-sm text-destructive">{errors.address.message}</p>
+                )}
               </div>
 
               {/* Mapa de origem */}
@@ -878,80 +1039,44 @@ export function ChamadoFormModal({ open, onOpenChange, onSuccess }: ChamadoFormM
               </div>
             </div>
 
-            {/* SEÇÃO 3: SERVIÇOS */}
+            {/* SEÇÃO 3: TIPO DE SERVIÇO */}
             <div className="space-y-4 pt-4 border-t">
               <h3 className="font-semibold flex items-center gap-2 text-base">
                 <Wrench className="h-4 w-4 text-primary" />
-                Serviços
+                Tipo de Serviço de Guincho
               </h3>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="flex items-center justify-between rounded-lg border p-3">
-                  <div className="space-y-0.5">
-                    <Label className="text-sm font-medium">Procurar Prestador para Vistoria?</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Ativa busca por vistoriador (motoboy)
-                    </p>
-                  </div>
-                  <Controller
-                    control={control}
-                    name="is_to_search_partner"
-                    render={({ field }) => (
-                      <Switch checked={field.value} onCheckedChange={field.onChange} />
-                    )}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between rounded-lg border p-3">
-                  <div className="space-y-0.5">
-                    <Label className="text-sm font-medium">Lançar proposta de serviço SOS?</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Ativa serviço de guincho/assistência
-                    </p>
-                  </div>
-                  <Controller
-                    control={control}
-                    name="will_use_tow_truck"
-                    render={({ field }) => (
-                      <Switch checked={field.value} onCheckedChange={field.onChange} />
-                    )}
-                  />
-                </div>
-              </div>
-
-              {watchWillUseTowTruck && (
-                <div className="space-y-2">
-                  <Label>
-                    Tipo de Serviço <span className="text-destructive">*</span>
-                  </Label>
-                  <Controller
-                    control={control}
-                    name="towing_service_type"
-                    render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <SelectTrigger className={cn(errors.towing_service_type && "border-destructive")}>
-                          <SelectValue placeholder="Selecione o tipo de serviço" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {towingServiceOptions.map((group) => (
-                            <SelectGroup key={group.group}>
-                              <SelectLabel>{group.group}</SelectLabel>
-                              {group.options.map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
-                                  {option.label}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                  {errors.towing_service_type && (
-                    <p className="text-sm text-destructive">{errors.towing_service_type.message}</p>
+              <div className="space-y-2">
+                <Label>
+                  Tipo de Serviço <span className="text-destructive">*</span>
+                </Label>
+                <Controller
+                  control={control}
+                  name="towing_service_type"
+                  render={({ field }) => (
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <SelectTrigger className={cn(errors.towing_service_type && "border-destructive")}>
+                        <SelectValue placeholder="Selecione o tipo de serviço de guincho" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {towingServiceOptions.map((group) => (
+                          <SelectGroup key={group.group}>
+                            <SelectLabel>{group.group}</SelectLabel>
+                            {group.options.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   )}
-                </div>
-              )}
+                />
+                {errors.towing_service_type && (
+                  <p className="text-sm text-destructive">{errors.towing_service_type.message}</p>
+                )}
+              </div>
             </div>
 
             {/* SEÇÃO 4: DESTINO (CONDICIONAL) */}
@@ -962,44 +1087,69 @@ export function ChamadoFormModal({ open, onOpenChange, onSuccess }: ChamadoFormM
                   Destino
                 </h3>
 
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label>
-                      Endereço de Destino <span className="text-destructive">*</span>
-                    </Label>
+                <div className="space-y-2">
+                  <Label>
+                    Endereço de Destino <span className="text-destructive">*</span>
+                  </Label>
+                  <div className="flex gap-2">
                     {isLoaded ? (
-                      <Autocomplete
-                        onLoad={setDestinationAutocomplete}
-                        onPlaceChanged={onDestinationPlaceChanged}
-                      >
-                        <Controller
-                          control={control}
-                          name="destination.address"
-                          render={({ field }) => (
-                            <Input
-                              {...field}
-                              placeholder="Digite o endereço de destino"
-                            />
-                          )}
-                        />
-                      </Autocomplete>
+                      <div className="flex-1">
+                        <Autocomplete
+                          onLoad={setDestinationAutocomplete}
+                          onPlaceChanged={onDestinationPlaceChanged}
+                          options={autocompleteOptions}
+                        >
+                          <Controller
+                            control={control}
+                            name="destination.address"
+                            render={({ field }) => (
+                              <Input
+                                {...field}
+                                placeholder="Digite o endereço de destino"
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleSearchDestinationAddress();
+                                  }
+                                }}
+                              />
+                            )}
+                          />
+                        </Autocomplete>
+                      </div>
                     ) : (
                       <Controller
                         control={control}
                         name="destination.address"
                         render={({ field }) => (
-                          <Input {...field} placeholder="Digite o endereço de destino" />
+                          <Input
+                            {...field}
+                            placeholder="Digite o endereço de destino"
+                            className="flex-1"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleSearchDestinationAddress();
+                              }
+                            }}
+                          />
                         )}
                       />
                     )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Link do Google Maps - Destino (opcional)</Label>
-                    <Input
-                      placeholder="https://maps.google.com/..."
-                      onChange={(e) => handleDestinationLinkChange(e.target.value)}
-                    />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="icon"
+                      className="shrink-0"
+                      onClick={handleSearchDestinationAddress}
+                      disabled={isSearchingAddress || !isLoaded}
+                    >
+                      {isSearchingAddress ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Search className="h-4 w-4" />
+                      )}
+                    </Button>
                   </div>
                 </div>
 
@@ -1051,5 +1201,6 @@ export function ChamadoFormModal({ open, onOpenChange, onSuccess }: ChamadoFormM
         </ScrollArea>
       </DialogContent>
     </Dialog>
+    </>
   );
 }

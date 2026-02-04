@@ -87,17 +87,36 @@ export default function Atendimentos() {
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Estados dos filtros
+  // Estados dos filtros (aplicados na API)
   const [statusFilter, setStatusFilter] = useState<string>("todos");
   const [tipoFilter, setTipoFilter] = useState<string>("todos");
+  const [plataformFilter, setPlataformFilter] = useState<string>("todos");
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const [debouncedSearch, setDebouncedSearch] = useState<string>("");
+
+  // Debounce da busca para não chamar a API a cada tecla
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchTerm), 400);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
+
+  // Ao mudar a busca, voltar para a página 1
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch]);
 
   useEffect(() => {
     async function fetchAtendimentos() {
       try {
         setLoading(true);
         setError(null);
-        const response = await atendimentosService.getAll(currentPage);
+        const response = await atendimentosService.getAll({
+          page: currentPage,
+          status: statusFilter !== "todos" ? statusFilter : undefined,
+          request_reason: tipoFilter !== "todos" ? tipoFilter : undefined,
+          plataform: plataformFilter !== "todos" ? plataformFilter : undefined,
+          search: debouncedSearch.trim() || undefined,
+        });
         setAtendimentos(response.data);
         setPagination(response.pagination);
       } catch (err) {
@@ -109,33 +128,12 @@ export default function Atendimentos() {
     }
 
     fetchAtendimentos();
-  }, [currentPage]);
+  }, [currentPage, statusFilter, tipoFilter, plataformFilter, debouncedSearch]);
 
-  // Filtra os atendimentos localmente
-  const atendimentosFiltrados = atendimentos.filter((atd) => {
-    // Filtro de status
-    if (statusFilter !== "todos" && atd.status !== statusFilter) {
-      return false;
-    }
-
-    // Filtro de tipo (request_reason)
-    if (tipoFilter !== "todos" && atd.request_reason !== tipoFilter) {
-      return false;
-    }
-    
-    // Filtro de busca (ID, telefone ou endereço)
-    if (searchTerm) {
-      const search = searchTerm.toLowerCase();
-      const matchPhone = atd.phone.toLowerCase().includes(search);
-      const matchAssociate = atd.associate_cars?.associates?.name.toLowerCase().includes(search);
-
-      if (!matchPhone && !matchAssociate) {
-        return false;
-      }
-    }
-
-    return true;
-  });
+  const applyFilter = (setter: (v: string) => void, value: string) => {
+    setter(value);
+    setCurrentPage(1);
+  };
 
   return (
     <DashboardLayout title="Atendimentos" subtitle="Gerencie todos os atendimentos em tempo real">
@@ -167,8 +165,27 @@ export default function Atendimentos() {
             </TabsList>
           </Tabs>
 
-          {/* Filtro de Status */}
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          {/* Filtro de Tipo */}
+          <Select value={tipoFilter} onValueChange={(v) => applyFilter(setTipoFilter, v)}>
+            <SelectTrigger className="w-[280px] h-10 rounded-xl">
+              <SelectValue placeholder="Filtrar por Tipo" />
+            </SelectTrigger>
+            <SelectContent className="cursor-pointer">
+              <SelectItem className="cursor-pointer" value="todos">Todos os Tipos</SelectItem>
+              <SelectItem className="cursor-pointer" value="collision">Colisão</SelectItem>
+              <SelectItem className="cursor-pointer" value="fire">Incêndio</SelectItem>
+              <SelectItem className="cursor-pointer" value="natural_events">Eventos Naturais</SelectItem>
+              <SelectItem className="cursor-pointer" value="breakdown_by_mechanical_failure_or_electric">Pane Mecânica ou Elétrica</SelectItem>
+              <SelectItem className="cursor-pointer" value="flat_tire">Pneu Furado</SelectItem>
+              <SelectItem className="cursor-pointer" value="battery_failure">Falha na Bateria</SelectItem>
+              <SelectItem className="cursor-pointer" value="locked_vehicle">Veículo Trancado</SelectItem>
+              <SelectItem className="cursor-pointer" value="empty_tank">Tanque Vazio</SelectItem>
+              <SelectItem className="cursor-pointer" value="theft_or_robbery">Furto ou Roubo</SelectItem>
+            </SelectContent>
+          </Select>
+
+           {/* Filtro de Status */}
+          <Select value={statusFilter} onValueChange={(v) => applyFilter(setStatusFilter, v)}>
             <SelectTrigger className="w-[280px] h-10 rounded-xl">
               <SelectValue placeholder="Filtrar por Status" />
             </SelectTrigger>
@@ -187,34 +204,31 @@ export default function Atendimentos() {
             </SelectContent>
           </Select>
 
-          {/* Filtro de Tipo */}
-          <Select value={tipoFilter} onValueChange={setTipoFilter}>
-            <SelectTrigger className="w-[280px] h-10 rounded-xl">
-              <SelectValue placeholder="Filtrar por Tipo" />
+          {/* Filtro de Plataforma */}
+          <Select value={plataformFilter} onValueChange={(v) => applyFilter(setPlataformFilter, v)}>
+            <SelectTrigger className="w-[200px] h-10 rounded-xl">
+              <SelectValue placeholder="Filtrar por Plataforma" />
             </SelectTrigger>
             <SelectContent className="cursor-pointer">
-              <SelectItem className="cursor-pointer" value="todos">Todos os Tipos</SelectItem>
-              <SelectItem className="cursor-pointer" value="collision">Colisão</SelectItem>
-              <SelectItem className="cursor-pointer" value="fire">Incêndio</SelectItem>
-              <SelectItem className="cursor-pointer" value="natural_events">Eventos Naturais</SelectItem>
-              <SelectItem className="cursor-pointer" value="breakdown_by_mechanical_failure_or_electric">Pane Mecânica ou Elétrica</SelectItem>
-              <SelectItem className="cursor-pointer" value="flat_tire">Pneu Furado</SelectItem>
-              <SelectItem className="cursor-pointer" value="battery_failure">Falha na Bateria</SelectItem>
-              <SelectItem className="cursor-pointer" value="locked_vehicle">Veículo Trancado</SelectItem>
-              <SelectItem className="cursor-pointer" value="empty_tank">Tanque Vazio</SelectItem>
-              <SelectItem className="cursor-pointer" value="theft_or_robbery">Furto ou Roubo</SelectItem>
+              <SelectItem className="cursor-pointer" value="todos">Todas as Plataformas</SelectItem>
+              <SelectItem className="cursor-pointer" value="whatsapp">WhatsApp</SelectItem>
+              <SelectItem className="cursor-pointer" value="retell">Retell</SelectItem>
+              <SelectItem className="cursor-pointer" value="vonage">Vonage</SelectItem>
+              <SelectItem className="cursor-pointer" value="webchat">Webchat</SelectItem>
             </SelectContent>
           </Select>
 
           {/* Botão Limpar Filtros */}
-          {(statusFilter !== "todos" || tipoFilter !== "todos" || searchTerm) && (
+          {(statusFilter !== "todos" || tipoFilter !== "todos" || plataformFilter !== "todos" || searchTerm) && (
             <Button
               variant="outline"
               className="h-10 rounded-xl gap-2"
               onClick={() => {
                 setStatusFilter("todos");
                 setTipoFilter("todos");
+                setPlataformFilter("todos");
                 setSearchTerm("");
+                setCurrentPage(1);
               }}
             >
               <XCircle className="h-4 w-4" />
@@ -237,16 +251,9 @@ export default function Atendimentos() {
         <CardHeader className="pb-4">
           <CardTitle className="text-lg">Lista de Atendimentos</CardTitle>
           <CardDescription>
-            {pagination && (
-              <>
-                {atendimentosFiltrados.length < atendimentos.length ? (
-                  `Mostrando ${atendimentosFiltrados.length} de ${atendimentos.length} atendimentos (filtrados)`
-                ) : (
-                  `Exibindo ${pagination.from} - ${pagination.to} de ${pagination.total} atendimentos`
-                )}
-              </>
-            )}
-            {!pagination && 'Visualize e gerencie os atendimentos'}
+            {pagination
+              ? `Exibindo ${pagination.from} a ${pagination.to} de ${pagination.total} atendimentos`
+              : 'Visualize e gerencie os atendimentos'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -275,20 +282,18 @@ export default function Atendimentos() {
           )}
 
           {/* Empty State */}
-          {!loading && !error && atendimentosFiltrados.length === 0 && (
+          {!loading && !error && atendimentos.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold mb-2">Nenhum atendimento encontrado</h3>
               <p className="text-sm text-muted-foreground">
-                {atendimentos.length === 0
-                  ? "Não há atendimentos disponíveis no momento"
-                  : "Nenhum atendimento corresponde aos filtros selecionados"}
+                Não há atendimentos que correspondam aos filtros ou à busca.
               </p>
             </div>
           )}
 
           {/* Table with Data */}
-          {!loading && !error && atendimentosFiltrados.length > 0 && (
+          {!loading && !error && atendimentos.length > 0 && (
             <>
               <Table>
                 <TableHeader>
@@ -304,7 +309,7 @@ export default function Atendimentos() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {atendimentosFiltrados.map((atd) => {
+                  {atendimentos.map((atd) => {
                     const statusInfo = statusConfig[atd.status] || {
                       label: atd.status,
                       variant: "secondary" as const,

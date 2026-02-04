@@ -1,21 +1,11 @@
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import type { AttendanceByHour } from "@/services/dashboard.service";
 
-const data = [
-  { hour: "00h", atendimentos: 12 },
-  { hour: "02h", atendimentos: 8 },
-  { hour: "04h", atendimentos: 5 },
-  { hour: "06h", atendimentos: 15 },
-  { hour: "08h", atendimentos: 35 },
-  { hour: "10h", atendimentos: 48 },
-  { hour: "12h", atendimentos: 42 },
-  { hour: "14h", atendimentos: 55 },
-  { hour: "16h", atendimentos: 62 },
-  { hour: "18h", atendimentos: 58 },
-  { hour: "20h", atendimentos: 45 },
-  { hour: "22h", atendimentos: 28 },
-];
+interface AttendanceChartProps {
+  data: AttendanceByHour[];
+}
 
-export function AttendanceChart() {
+export function AttendanceChart({ data }: AttendanceChartProps) {
   return (
     <div className="bg-card rounded-2xl border border-border/50 p-6 animate-fade-in-up h-full">
       <div className="flex items-center justify-between mb-6">
@@ -65,7 +55,8 @@ export function AttendanceChart() {
             />
             <Area
               type="monotone"
-              dataKey="atendimentos"
+              dataKey="attendances"
+              name="Atendimentos"
               stroke="hsl(160, 100%, 22%)"
               strokeWidth={3}
               fillOpacity={1}

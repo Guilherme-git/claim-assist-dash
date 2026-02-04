@@ -89,6 +89,36 @@ export enum CallCreationMethod {
 // INTERFACES - Estrutura Real da API
 // ============================================
 
+// iLeva Associate Search
+export interface ILevaVehicle {
+  id: number;
+  placa: string;
+  chassi: string;
+  ano_modelo: string;
+  marca: string;
+  modelo: string;
+  cor: string;
+}
+
+export interface ILevaAssociate {
+  id: number;
+  nome: string;
+  cpf: string;
+  email: string;
+  tel_celular: string;
+  association: string;
+  vehicles: ILevaVehicle[];
+}
+
+export interface ILevaAssociateSearchResponse {
+  query: {
+    name: string;
+    association: string;
+  };
+  total: number;
+  data: ILevaAssociate[];
+}
+
 export interface Associates {
   id: string;
   ileva_associate_id: string | null;
@@ -314,11 +344,70 @@ export const callTowingStatusVariants: Record<string, BadgeVariant> = {
 // SERVICE
 // ============================================
 
+export interface CallsFilters {
+  page?: number;
+  limit?: number;
+  status?: string;
+  towing_service_type?: string;
+  association?: string;
+  search?: string;
+}
+
+export interface CreateTowingCallPayload {
+  associate_car_id: number;
+  address: string;
+  association: string;
+  towing_service_type: string;
+  observation?: string;
+  location: {
+    latitude: number;
+    longitude: number;
+  };
+  uf_id: number;
+  city_id: number;
+  destination?: {
+    address?: string;
+    location?: {
+      latitude: number;
+      longitude: number;
+    };
+  };
+}
+
 export const callsService = {
-  getAll: async (page: number = 1): Promise<CallsResponse> => {
-    const { data } = await api.get<CallsResponse>('/api/calls', {
-      params: { page }
+  /**
+   * GET /api/calls/guinchos
+   * Filtros disponíveis: page, limit, status (calls_status), towing_service_type, association, search
+   * NOTA: status filtra pelo campo 'status' (calls_status), não pelo 'towing_status'
+   */
+  getAll: async (filters: CallsFilters = {}): Promise<CallsResponse> => {
+    const { page = 1, limit = 10, status, towing_service_type, association, search } = filters;
+    const params: Record<string, string | number> = { page, limit };
+    if (status && status !== 'todos') params.status = status;
+    if (towing_service_type && towing_service_type !== 'todos') params.towing_service_type = towing_service_type;
+    if (association && association !== 'todos') params.association = association;
+    if (search && search.trim()) params.search = search.trim();
+    const { data } = await api.get<CallsResponse>('/api/calls/guinchos', { params });
+    return data;
+  },
+
+  /**
+   * GET /api/associates/search
+   * Busca associados conforme o usuário digita
+   */
+  searchAssociates: async (name: string, association: string): Promise<ILevaAssociateSearchResponse> => {
+    const { data } = await api.get<ILevaAssociateSearchResponse>('/api/associates/search', {
+      params: { name, association },
     });
+    return data;
+  },
+
+  /**
+   * POST /api/calls/guinchos
+   * Cria um novo chamado de guincho
+   */
+  createTowingCall: async (payload: CreateTowingCallPayload): Promise<Call> => {
+    const { data } = await api.post<Call>('/api/calls/guinchos', payload);
     return data;
   },
 };

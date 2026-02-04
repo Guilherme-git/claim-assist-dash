@@ -9,7 +9,7 @@ interface MetricCardProps {
     value: number;
     isPositive: boolean;
   };
-  variant?: "default" | "primary" | "success" | "warning" | "danger";
+  variant?: "default" | "primary" | "success" | "warning" | "danger" | "info" | "teal";
   delay?: number;
 }
 
@@ -19,6 +19,8 @@ const variantStyles = {
   success: "bg-gradient-to-br from-success via-success to-success/80 text-success-foreground border-success/20",
   warning: "bg-gradient-to-br from-warning via-warning to-warning/80 text-warning-foreground border-warning/20",
   danger: "bg-gradient-to-br from-destructive via-destructive to-destructive/80 text-destructive-foreground border-destructive/20",
+  info: "bg-gradient-to-br from-info via-info to-info/80 text-info-foreground border-info/20",
+  teal: "bg-gradient-to-br from-teal-500 via-teal-500 to-teal-600 text-white border-teal-400/20",
 };
 
 const iconBgStyles = {
@@ -27,6 +29,8 @@ const iconBgStyles = {
   success: "bg-white/20 text-white backdrop-blur-sm",
   warning: "bg-black/10 text-black/80 backdrop-blur-sm",
   danger: "bg-white/20 text-white backdrop-blur-sm",
+  info: "bg-white/20 text-white backdrop-blur-sm",
+  teal: "bg-white/20 text-white backdrop-blur-sm",
 };
 
 export function MetricCard({ title, value, icon: Icon, trend, variant = "default", delay = 0 }: MetricCardProps) {

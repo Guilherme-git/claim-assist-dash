@@ -32,6 +32,7 @@ export interface AssociateCars {
   associates?: Associates;
 }
 
+/** Chaves possíveis do questionário (service_form.payload) – API pode enviar outras. */
 export interface ServiceFormPayload {
   vehicle_cargo?: string;
   associate_items?: string;
@@ -47,13 +48,43 @@ export interface ServiceFormPayload {
   vehicle_is_at_collision_scene?: string;
   locksmith_all_doors_locked?: string;
   locksmith_key_is_inside_vehicle?: string;
+  fuel_request?: string;
+  fuel_price?: string;
+  fuel_payment_type?: string;
+  tire_change_quantity?: string;
+  tire_change_associate_has_tools?: string;
+  tire_change_associate_has_spare_tire?: string;
+  battery_charge_resolution?: string;
+  accessible_vehicle?: string;
+  [key: string]: string | undefined;
 }
 
+/** service_form pode vir com ou sem payload; flow_token pode existir ou não. */
 export interface ServiceForm {
-  payload?: ServiceFormPayload;
-  flow_token: string;
+  payload?: ServiceFormPayload | null;
+  flow_token?: string;
   locksmith_all_doors_locked?: string;
   locksmith_key_is_inside_vehicle?: string;
+}
+
+/**
+ * API pode retornar service_form de duas formas:
+ * 1) Com payload: { payload: { vehicle_cargo: "...", ... }, flow_token?: "..." }
+ * 2) Objeto plano: { vehicle_cargo: "...", associate_items: "...", ... }
+ */
+export type ServiceFormApi = ServiceForm | Record<string, string>;
+
+export interface Call {
+  id: string;
+  towing_service_type: string | null;
+  address: string | null;
+  status: string | null;
+  towing_status: string | null;
+  association: string;
+  created_at: string;
+  updated_at: string;
+  associate_service_id: string | null;
+  [key: string]: unknown;
 }
 
 export interface AssociateService {
@@ -65,13 +96,17 @@ export interface AssociateService {
   plataform: string;
   phone: string;
   request_reason: string | null;
-  service_form: ServiceForm | null;
+  /** Forma 1: { payload: {...}, flow_token? }. Forma 2: objeto plano com chaves do questionário. */
+  service_form?: ServiceFormApi | null;
   origin_address: string | null;
   destination_address: string | null;
   status: string;
   created_at: string;
   updated_at: string;
   associate_cars?: AssociateCars;
+  associate_service_events?: unknown[];
+  calls?: Call[];
+  accidents?: unknown[];
 }
 
 export interface Pagination {
@@ -88,11 +123,23 @@ export interface AssociateServicesResponse {
   pagination: Pagination;
 }
 
+export interface AtendimentosFilters {
+  page?: number;
+  status?: string;
+  request_reason?: string;
+  plataform?: string;
+  search?: string;
+}
+
 export const atendimentosService = {
-  getAll: async (page: number = 1): Promise<AssociateServicesResponse> => {
-    const { data } = await api.get<AssociateServicesResponse>('/api/associate-services', {
-      params: { page }
-    });
+  getAll: async (filters: AtendimentosFilters = {}): Promise<AssociateServicesResponse> => {
+    const { page = 1, status, request_reason, plataform, search } = filters;
+    const params: Record<string, string | number> = { page };
+    if (status && status !== 'todos') params.status = status;
+    if (request_reason && request_reason !== 'todos') params.request_reason = request_reason;
+    if (plataform && plataform !== 'todos') params.plataform = plataform;
+    if (search?.trim()) params.search = search.trim();
+    const { data } = await api.get<AssociateServicesResponse>('/api/associate-services', { params });
     return data;
   },
 
