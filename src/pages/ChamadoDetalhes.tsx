@@ -14,18 +14,16 @@ import {
   Mail,
   FileText,
   Clock,
-  CheckCircle2,
   AlertCircle,
   Loader2,
   Copy,
   Truck,
   Wrench,
   Calendar,
-  Hash,
   Building,
   ExternalLink,
 } from "lucide-react";
-import { formatPhone, formatDateTime } from "@/lib/utils";
+import { formatDateTime } from "@/lib/utils";
 import {
   type Call,
   callStatusLabels,
@@ -37,63 +35,267 @@ import {
 } from "@/services/calls.service";
 import { toast } from "sonner";
 
+// Componentes modulares
+import { TowingDriverCard } from "@/components/chamados/TowingDriverCard";
+import { BillsCard } from "@/components/chamados/BillsCard";
+import { RatingsCard } from "@/components/chamados/RatingsCard";
+import { CallTripsCard } from "@/components/chamados/CallTripsCard";
+import { InspectionsCard } from "@/components/chamados/InspectionsCard";
+import { CreatedByCard } from "@/components/chamados/CreatedByCard";
+
 // Dados mockados baseados no retorno da API
 const mockChamado: Call = {
-  id: "43012",
-  towing_service_type: "tire_change_heavy",
+  id: "43016",
+  towing_service_type: "towing_light",
   biker_id: null,
-  associate_car_id: "9993",
-  address: "Rua H, 333 - Rio de Janeiro/RJ",
-  observation: null,
-  status: "in_service",
-  towing_status: "waiting_arrival_to_checkout",
-  creation_method: null,
-  towing_driver_accepted_at: null,
-  association: "motoclub",
+  associate_car_id: "1",
+  address: "Av. Paulista, 1578 - Bela Vista, São Paulo/SP",
+  observation: "CHAMADO TESTE COMPLETO",
+  status: null,
+  towing_status: "finished",
+  creation_method: "manually",
+  towing_driver_accepted_at: "2026-02-04T09:55:48.000Z",
+  association: "solidy",
   biker_accepted_at: null,
-  created_at: "2026-02-04T08:06:20.000Z",
-  updated_at: "2026-02-04T09:36:20.000Z",
+  created_at: "2026-02-04T08:55:48.000Z",
+  updated_at: "2026-02-04T11:55:48.000Z",
   sort: null,
-  user_id: null,
+  user_id: "5",
   estimated_time_arrival: null,
   biker_arrived_at: null,
   biker_finished_at: null,
-  towing_driver_id: null,
+  towing_driver_id: "1",
   webassist_call_code: null,
   webassist_protocol_code: null,
   webassist_associate_document: null,
   webassist_assistance_code: null,
-  uf_id: "",
-  city_id: "",
-  associate_service_id: "",
+  uf_id: null,
+  city_id: null,
+  associate_service_id: null,
   associate_cars: {
-    id: "9993",
-    associate_id: "12767",
-    ileva_associate_vehicle_id: null,
+    id: "1",
+    associate_id: "1",
+    ileva_associate_vehicle_id: "14822",
     fipe_id: null,
     category: "car",
-    plate: "QAH8441",
+    plate: "PRN8I07",
     chassi: null,
-    brand: "VW - VOLKSWAGEN",
-    model: "GOL TRENDLINE 1.0 T.FLEX 12V 5P",
-    color: "PRATA",
-    year: "2017",
-    created_at: "2025-08-03T03:53:25.000Z",
-    updated_at: "2025-08-03T03:53:25.000Z",
+    brand: "Peugeot",
+    model: "206 SOLEIL 1.6 16V 5P",
+    color: "PRETO",
+    year: "2003-1",
+    created_at: "2024-07-24T11:33:41.000Z",
+    updated_at: "2024-09-18T15:46:27.000Z",
     associates: {
-      id: "12767",
-      ileva_associate_id: null,
-      association: "motoclub",
-      name: "LUIS FELIPE DIAS PAIM",
-      email: null,
-      phone: "(62) 99571-2680",
-      cpf: "036.088.921-25",
-      created_at: "2025-08-03T03:53:25.000Z",
-      updated_at: "2025-08-03T03:53:25.000Z",
+      id: "1",
+      ileva_associate_id: "13498",
+      association: null,
+      name: "ADELIA LUCAS PEREIRA",
+      email: "hggcentrocirurgico@idtech.org.br",
+      phone: "(62) 98533-1827",
+      cpf: "065.691.508-04",
+      created_at: "2024-07-24T11:33:41.000Z",
+      updated_at: "2024-07-24T11:33:41.000Z",
     },
   },
-  towing_drivers: null,
-  users: null,
+  towing_drivers: {
+    id: "1",
+    status: "in_service",
+    towing_provider_id: "1",
+    cpf: "004.234.301-14",
+    name: "Lucas",
+    phone: "(85) 99439-0988",
+    device_imei: null,
+    profile_image_path: "public/towing_driver_profile/dFDyja1oTCytaiHuHK5oDkCvYg4uoomND7Y4wAv7.jpg",
+    created_at: "2025-02-19T20:00:09.000Z",
+    updated_at: "2025-11-26T14:03:04.000Z",
+    firebase_message_token: null,
+  },
+  users: {
+    id: "5",
+    name: "Thais Santos",
+    email: "thaispsantos0901@gmail.com",
+  },
+  bills: [
+    {
+      id: "3046",
+      call_id: "43016",
+      value: "150",
+      description: null,
+      status: "paid",
+      due_date: null,
+      payment_date: "2026-02-04T12:55:48.000Z",
+      payment_method: "pix",
+      pix_key_type: null,
+      pix_key: null,
+      payment_vouncher_file_path: null,
+      created_at: "2026-02-04T12:55:48.000Z",
+      updated_at: "2026-02-04T12:55:48.000Z",
+      total_value: "150",
+    },
+  ],
+  ratings: [
+    {
+      id: "2780",
+      call_id: "43016",
+      service_type: "towing_driver",
+      rating: 5,
+      complaint: null,
+      created_at: "2026-02-04T15:56:30.000Z",
+      updated_at: "2026-02-04T15:56:30.000Z",
+    },
+    {
+      id: "2781",
+      call_id: "43016",
+      service_type: "towing_driver",
+      rating: 5,
+      complaint: null,
+      created_at: "2026-02-04T15:56:36.000Z",
+      updated_at: "2026-02-04T15:56:36.000Z",
+    },
+  ],
+  call_trips: [
+    {
+      id: "49570",
+      call_id: "43016",
+      workable_type: null,
+      workable_id: null,
+      type: "towing_collect",
+      status: "finished",
+      address: "Av. Paulista, 1578",
+      started_at: "2026-02-04T09:25:48.000Z",
+      arrival_expectation: null,
+      current_arrival_expectation: null,
+      arrival_time: null,
+      arrived_at: null,
+      finished_at: "2026-02-04T10:10:48.000Z",
+      observation: null,
+      created_at: "2026-02-04T12:55:48.000Z",
+      updated_at: "2026-02-04T12:55:48.000Z",
+      uf_id: null,
+      city_id: null,
+      ufs: null,
+      cities: null,
+    },
+    {
+      id: "49571",
+      call_id: "43016",
+      workable_type: null,
+      workable_id: null,
+      type: "towing_delivery",
+      status: "finished",
+      address: "Rua dos Mecânicos, 500",
+      started_at: "2026-02-04T10:10:48.000Z",
+      arrival_expectation: null,
+      current_arrival_expectation: null,
+      arrival_time: null,
+      arrived_at: null,
+      finished_at: "2026-02-04T11:05:48.000Z",
+      observation: null,
+      created_at: "2026-02-04T12:55:48.000Z",
+      updated_at: "2026-02-04T12:55:48.000Z",
+      uf_id: null,
+      city_id: null,
+      ufs: null,
+      cities: null,
+    },
+  ],
+  inspections: [
+    {
+      id: "15641",
+      call_id: "43016",
+      towing_driver_id: "1",
+      type: "checkin",
+      created_at: "2026-02-04T09:55:48.000Z",
+      updated_at: "2026-02-04T12:55:48.000Z",
+      inspection_files: [
+        {
+          id: "91328",
+          inspection_id: "15641",
+          type: "vehicle_front_side_image",
+          path: "test/checkout_front.jpg",
+          created_at: "2026-02-04T12:55:48.000Z",
+          updated_at: "2026-02-04T12:55:48.000Z",
+        },
+        {
+          id: "91329",
+          inspection_id: "15641",
+          type: "vehicle_rear_side_image",
+          path: "test/checkout_rear.jpg",
+          created_at: "2026-02-04T12:55:48.000Z",
+          updated_at: "2026-02-04T12:55:48.000Z",
+        },
+        {
+          id: "91330",
+          inspection_id: "15641",
+          type: "vehicle_front_side_image",
+          path: "test/checkin_front.jpg",
+          created_at: "2026-02-04T15:56:18.000Z",
+          updated_at: "2026-02-04T15:56:18.000Z",
+        },
+        {
+          id: "91331",
+          inspection_id: "15641",
+          type: "vehicle_left_side_image",
+          path: "test/checkin_left.jpg",
+          created_at: "2026-02-04T15:56:18.000Z",
+          updated_at: "2026-02-04T15:56:18.000Z",
+        },
+      ],
+      towing_drivers: {
+        id: "1",
+        status: "in_service",
+        towing_provider_id: "1",
+        cpf: "004.234.301-14",
+        name: "Lucas",
+        phone: "(85) 99439-0988",
+        device_imei: null,
+        profile_image_path: null,
+        created_at: "2025-02-19T20:00:09.000Z",
+        updated_at: "2025-11-26T14:03:04.000Z",
+        firebase_message_token: null,
+      },
+    },
+    {
+      id: "15642",
+      call_id: "43016",
+      towing_driver_id: "1",
+      type: "checkout",
+      created_at: "2026-02-04T11:05:48.000Z",
+      updated_at: "2026-02-04T12:55:48.000Z",
+      inspection_files: [
+        {
+          id: "91334",
+          inspection_id: "15642",
+          type: "vehicle_front_side_image",
+          path: "test/checkout_front.jpg",
+          created_at: "2026-02-04T15:56:18.000Z",
+          updated_at: "2026-02-04T15:56:18.000Z",
+        },
+        {
+          id: "91335",
+          inspection_id: "15642",
+          type: "vehicle_rear_side_image",
+          path: "test/checkout_rear.jpg",
+          created_at: "2026-02-04T15:56:18.000Z",
+          updated_at: "2026-02-04T15:56:18.000Z",
+        },
+      ],
+      towing_drivers: {
+        id: "1",
+        status: "in_service",
+        towing_provider_id: "1",
+        cpf: "004.234.301-14",
+        name: "Lucas",
+        phone: "(85) 99439-0988",
+        device_imei: null,
+        profile_image_path: null,
+        created_at: "2025-02-19T20:00:09.000Z",
+        updated_at: "2025-11-26T14:03:04.000Z",
+        firebase_message_token: null,
+      },
+    },
+  ],
 };
 
 const categoryLabels: Record<string, string> = {
@@ -106,6 +308,12 @@ const categoryLabels: Record<string, string> = {
   bus: "Ônibus",
 };
 
+const creationMethodLabels: Record<string, string> = {
+  webassist: "WebAssist",
+  manually: "Manual",
+  associate_service: "Serviço do Associado",
+};
+
 export default function ChamadoDetalhes() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -114,13 +322,10 @@ export default function ChamadoDetalhes() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Simulação de carregamento da API
     const fetchChamado = async () => {
       try {
         setLoading(true);
         setError(null);
-        // TODO: Substituir pelo serviço real
-        // const response = await callsService.getById(id);
         await new Promise((resolve) => setTimeout(resolve, 500));
         setChamado({ ...mockChamado, id: id || mockChamado.id });
       } catch (err) {
@@ -207,10 +412,12 @@ export default function ChamadoDetalhes() {
         </Button>
 
         <div className="flex items-center gap-3">
-          <Badge variant={statusVariant} className="gap-1.5 rounded-lg text-sm px-3 py-1">
-            <Wrench className="h-4 w-4" />
-            {statusLabel}
-          </Badge>
+          {chamado.status && (
+            <Badge variant={statusVariant} className="gap-1.5 rounded-lg text-sm px-3 py-1">
+              <Wrench className="h-4 w-4" />
+              {statusLabel}
+            </Badge>
+          )}
           {chamado.towing_status && (
             <Badge variant={towingStatusVariant} className="gap-1.5 rounded-lg text-sm px-3 py-1">
               <Truck className="h-4 w-4" />
@@ -260,8 +467,10 @@ export default function ChamadoDetalhes() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Método de Criação</p>
-                  <p className="font-medium capitalize">
-                    {chamado.creation_method || "Não informado"}
+                  <p className="font-medium">
+                    {chamado.creation_method
+                      ? creationMethodLabels[chamado.creation_method] || chamado.creation_method
+                      : "Não informado"}
                   </p>
                 </div>
                 <div>
@@ -313,7 +522,7 @@ export default function ChamadoDetalhes() {
                   <Separator />
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">Observação</p>
-                    <p className="font-medium">{chamado.observation}</p>
+                    <p className="font-medium bg-muted/50 p-3 rounded-lg">{chamado.observation}</p>
                   </div>
                 </>
               )}
@@ -359,22 +568,6 @@ export default function ChamadoDetalhes() {
                   <p className="text-sm text-muted-foreground">Tempo Estimado de Chegada</p>
                   <p className="font-medium">
                     {chamado.estimated_time_arrival || "—"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Chegada do Motoboy</p>
-                  <p className="font-medium">
-                    {chamado.biker_arrived_at
-                      ? formatDateTime(chamado.biker_arrived_at)
-                      : "—"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Finalizado em</p>
-                  <p className="font-medium">
-                    {chamado.biker_finished_at
-                      ? formatDateTime(chamado.biker_finished_at)
-                      : "—"}
                   </p>
                 </div>
               </div>
@@ -442,6 +635,16 @@ export default function ChamadoDetalhes() {
               )}
             </CardContent>
           </Card>
+
+          {/* Card: Viagens */}
+          {chamado.call_trips && chamado.call_trips.length > 0 && (
+            <CallTripsCard trips={chamado.call_trips} />
+          )}
+
+          {/* Card: Inspeções */}
+          {chamado.inspections && chamado.inspections.length > 0 && (
+            <InspectionsCard inspections={chamado.inspections} />
+          )}
         </div>
 
         {/* Coluna Lateral */}
@@ -592,6 +795,26 @@ export default function ChamadoDetalhes() {
               )}
             </CardContent>
           </Card>
+
+          {/* Card: Motorista de Guincho */}
+          {chamado.towing_drivers && (
+            <TowingDriverCard driver={chamado.towing_drivers} />
+          )}
+
+          {/* Card: Criado por */}
+          {chamado.users && (
+            <CreatedByCard user={chamado.users} />
+          )}
+
+          {/* Card: Faturas */}
+          {chamado.bills && chamado.bills.length > 0 && (
+            <BillsCard bills={chamado.bills} />
+          )}
+
+          {/* Card: Avaliações */}
+          {chamado.ratings && chamado.ratings.length > 0 && (
+            <RatingsCard ratings={chamado.ratings} />
+          )}
         </div>
       </div>
     </DashboardLayout>
