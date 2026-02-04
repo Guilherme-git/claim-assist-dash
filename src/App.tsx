@@ -18,6 +18,7 @@ import Historico from "./pages/Historico";
 import Relatorios from "./pages/Relatorios";
 import Configuracoes from "./pages/Configuracoes";
 import Acompanhamento from "./pages/Acompanhamento";
+import AcompanhamentoFullscreen from "./pages/AcompanhamentoFullscreen";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -45,6 +46,7 @@ const App = () => (
               <Route path="/config" element={<Configuracoes />} />
               <Route path="/acompanhamento" element={<Acompanhamento />} />
             </Route>
+            <Route path="/acompanhamento-fullscreen" element={<AcompanhamentoFullscreen />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
