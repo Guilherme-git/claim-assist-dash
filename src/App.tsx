@@ -17,6 +17,7 @@ import Mapa from "./pages/Mapa";
 import Historico from "./pages/Historico";
 import Relatorios from "./pages/Relatorios";
 import Configuracoes from "./pages/Configuracoes";
+import Acompanhamento from "./pages/Acompanhamento";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -42,6 +43,7 @@ const App = () => (
               <Route path="/historico" element={<Historico />} />
               <Route path="/relatorios" element={<Relatorios />} />
               <Route path="/config" element={<Configuracoes />} />
+              <Route path="/acompanhamento" element={<Acompanhamento />} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
