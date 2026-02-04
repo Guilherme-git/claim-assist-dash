@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -71,6 +72,7 @@ const statusIcons: Record<string, any> = {
 };
 
 export default function Chamados() {
+  const navigate = useNavigate();
   const [chamados, setChamados] = useState<Call[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(true);
@@ -329,7 +331,11 @@ export default function Chamados() {
                       : AlertCircle;
 
                     return (
-                      <TableRow key={chamado.id} className="group">
+                      <TableRow
+                        key={chamado.id}
+                        className="group cursor-pointer hover:bg-muted/50"
+                        onClick={() => navigate(`/chamados/${chamado.id}`)}
+                      >
                         <TableCell className="font-mono text-sm font-medium text-primary">
                           #CH-{chamado.id}
                         </TableCell>

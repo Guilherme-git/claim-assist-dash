@@ -62,6 +62,11 @@ export interface RecentAttendance {
   associate_cars?: AssociateCar | null;
 }
 
+export interface AttendanceByHour {
+  hour: string;
+  attendances: number;
+}
+
 export interface DashboardData {
   attendancesToday: number;
   attendancesInProgress: number;

@@ -10,6 +10,7 @@ import Auth from "./pages/Auth";
 import Atendimentos from "./pages/Atendimentos";
 import AtendimentoDetalhes from "./pages/AtendimentoDetalhes";
 import Chamados from "./pages/Chamados";
+import ChamadoDetalhes from "./pages/ChamadoDetalhes";
 import Prestadores from "./pages/Prestadores";
 import Equipe from "./pages/Equipe";
 import Mapa from "./pages/Mapa";
@@ -32,6 +33,7 @@ const App = () => (
             <Route element={<ProtectedRoute />}>
               <Route path="/dashboard" element={<Index />} />
               <Route path="/chamados" element={<Chamados />} />
+              <Route path="/chamados/:id" element={<ChamadoDetalhes />} />
               <Route path="/atendimentos" element={<Atendimentos />} />
               <Route path="/atendimentos/:id" element={<AtendimentoDetalhes />} />
               <Route path="/prestadores" element={<Prestadores />} />
