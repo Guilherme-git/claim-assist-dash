@@ -1,12 +1,15 @@
 import { User, Car, Calendar, Clock, Maximize2, Minimize2, Volume2, VolumeX, Loader2, AlertCircle, ChevronLeft, ChevronRight, MapPin as RouteIcon, Timer, Wrench, Building2 } from "lucide-react";
-import { LayoutGrid, BarChart3 } from "lucide-react";
+import { LayoutGrid, BarChart3, Calendar as CalendarIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Calendar as CalendarPicker } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { AreaChart, Area, RadialBarChart, RadialBar } from "recharts";
-import { formatDateTime } from "@/lib/utils";
-import { cn } from "@/lib/utils";
+import { formatDateTime, cn } from "@/lib/utils";
 import { useState, useEffect, useRef } from "react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { callsService, type OpenCall, type Pagination } from "@/services/calls.service";
 
 type TimeStatus = "on_time" | "delayed" | "alert";
@@ -676,6 +679,9 @@ interface AnalyticsViewProps {
 }
 
 const AnalyticsView = ({ summary, chamados }: AnalyticsViewProps) => {
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
+
   // Usar dados mockados se não houver dados reais
   const useMock = chamados.length === 0;
   const displaySummary = useMock ? mockSummary : summary;
@@ -782,7 +788,76 @@ const AnalyticsView = ({ summary, chamados }: AnalyticsViewProps) => {
           {/* Gráfico de Linha - Evolução */}
           <Card className="bg-white dark:bg-card border border-slate-200 dark:border-border rounded-xl shadow-sm">
             <CardContent className="p-5">
-              <h3 className="text-base font-semibold text-foreground mb-4">Evolução por Hora</h3>
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <h3 className="text-base font-semibold text-foreground">Evolução por Hora</h3>
+                <div className="flex items-center gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={cn(
+                          "h-8 w-[130px] justify-start text-left font-normal text-xs",
+                          !startDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
+                        {startDate ? format(startDate, "dd/MM/yyyy", { locale: ptBR }) : "Data início"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 pointer-events-auto" align="end">
+                      <CalendarPicker
+                        mode="single"
+                        selected={startDate}
+                        onSelect={setStartDate}
+                        initialFocus
+                        locale={ptBR}
+                        className="pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <span className="text-xs text-muted-foreground">até</span>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={cn(
+                          "h-8 w-[130px] justify-start text-left font-normal text-xs",
+                          !endDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
+                        {endDate ? format(endDate, "dd/MM/yyyy", { locale: ptBR }) : "Data fim"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 pointer-events-auto" align="end">
+                      <CalendarPicker
+                        mode="single"
+                        selected={endDate}
+                        onSelect={setEndDate}
+                        initialFocus
+                        locale={ptBR}
+                        disabled={(date) => startDate ? date < startDate : false}
+                        className="pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  {(startDate || endDate) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2 text-xs"
+                      onClick={() => {
+                        setStartDate(undefined);
+                        setEndDate(undefined);
+                      }}
+                    >
+                      Limpar
+                    </Button>
+                  )}
+                </div>
+              </div>
               <div className="h-[220px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={lineData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
