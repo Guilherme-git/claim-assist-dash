@@ -4569,6 +4569,20 @@ interface AcompanhamentoItem {
 - `isMuted = false`: Som tocando, ícone Volume2
 - `isMuted = true`: Som pausado, ícone VolumeX
 
+**Comportamento ao Alternar:**
+- **Ao desmutar (isMuted: true → false):**
+  - Se houver chamados atrasados (`summary.delayed > 0`), o áudio toca automaticamente
+  - O áudio é interrompido após exatamente 2.5 segundos usando `setTimeout`
+  - Previne reprodução infinita do alerta
+- **Ao mutar (isMuted: false → true):**
+  - Para o áudio imediatamente se estiver tocando
+  - Define volume para 0
+
+**Correção de Bug:**
+- **Problema anterior:** Ao clicar no botão de desmutar, o áudio tocava infinitamente
+- **Solução:** Adicionado `setTimeout(2500)` na função `toggleMute` para pausar o áudio após 2.5 segundos
+- **Resultado:** Tanto alertas automáticos quanto reprodução manual via botão respeitam a duração de 2.5 segundos
+
 ---
 
 ### **🚀 Acesso à Página**
