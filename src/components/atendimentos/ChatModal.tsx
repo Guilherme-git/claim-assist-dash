@@ -274,7 +274,7 @@ export function ChatModal({ open, onOpenChange, atendimento }: ChatModalProps) {
               </div>
             ))}
 
-            {/* Indicador de digitando */}
+            {/* Indicador de digitando - estilo ondas sonoras */}
             {displayedMessages.length < messages.length && (
               <div className="flex items-end gap-2 justify-start">
                 <Avatar className="h-7 w-7">
@@ -283,10 +283,17 @@ export function ChatModal({ open, onOpenChange, atendimento }: ChatModalProps) {
                   </AvatarFallback>
                 </Avatar>
                 <div className="bg-muted px-4 py-3 rounded-2xl rounded-bl-md">
-                  <div className="flex gap-1">
-                    <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                    <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                    <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                  <div className="flex items-center gap-[3px] h-5">
+                    {[...Array(5)].map((_, i) => (
+                      <span
+                        key={i}
+                        className="w-[3px] bg-primary/60 rounded-full animate-sound-wave"
+                        style={{
+                          animationDelay: `${i * 120}ms`,
+                          height: "100%",
+                        }}
+                      />
+                    ))}
                   </div>
                 </div>
               </div>
