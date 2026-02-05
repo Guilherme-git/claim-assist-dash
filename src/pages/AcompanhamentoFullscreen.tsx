@@ -656,6 +656,19 @@ const AcompanhamentoFullscreen = () => {
   );
 };
 
+// Dados mockados para teste
+const mockSummary = { delayed: 8, alert: 15, on_time: 42 };
+const mockChamados: OpenCall[] = [
+  { id: 1, timeStatus: 'delayed', associado: { name: 'João Silva', association: 'solidy' }, atendente: { name: 'Maria' }, veiculo: { brand: 'Fiat', model: 'Uno', plate: 'ABC-1234' }, created_at: '10:30', expected_arrival_date: '11:00', expected_completion_date: '12:00' },
+  { id: 2, timeStatus: 'alert', associado: { name: 'Pedro Santos', association: 'nova' }, atendente: { name: 'Carlos' }, veiculo: { brand: 'VW', model: 'Gol', plate: 'DEF-5678' }, created_at: '11:00', expected_arrival_date: '11:30', expected_completion_date: '12:30' },
+  { id: 3, timeStatus: 'on_time', associado: { name: 'Ana Costa', association: 'motoclub' }, atendente: { name: 'João' }, veiculo: { brand: 'Honda', model: 'CG 160', plate: 'GHI-9012' }, created_at: '11:15', expected_arrival_date: '12:00', expected_completion_date: '13:00' },
+  { id: 4, timeStatus: 'on_time', associado: { name: 'Lucas Oliveira', association: 'aprovel' }, atendente: { name: 'Ana' }, veiculo: { brand: 'Chevrolet', model: 'Onix', plate: 'JKL-3456' }, created_at: '11:30', expected_arrival_date: '12:15', expected_completion_date: '13:15' },
+  { id: 5, timeStatus: 'delayed', associado: { name: 'Mariana Lima', association: 'solidy' }, atendente: { name: 'Pedro' }, veiculo: { brand: 'Ford', model: 'Ka', plate: 'MNO-7890' }, created_at: '09:00', expected_arrival_date: '09:30', expected_completion_date: '10:30' },
+  { id: 6, timeStatus: 'alert', associado: { name: 'Rafael Souza', association: 'nova' }, atendente: { name: 'Lucas' }, veiculo: { brand: 'Toyota', model: 'Corolla', plate: 'PQR-1234' }, created_at: '10:45', expected_arrival_date: '11:15', expected_completion_date: '12:15' },
+  { id: 7, timeStatus: 'on_time', associado: { name: 'Fernanda Alves', association: 'motoclub' }, atendente: { name: 'Fernanda' }, veiculo: { brand: 'Yamaha', model: 'Factor', plate: 'STU-5678' }, created_at: '11:45', expected_arrival_date: '12:30', expected_completion_date: '13:30' },
+  { id: 8, timeStatus: 'on_time', associado: { name: 'Bruno Ferreira', association: 'solidy' }, atendente: { name: 'Bruno' }, veiculo: { brand: 'Hyundai', model: 'HB20', plate: 'VWX-9012' }, created_at: '12:00', expected_arrival_date: '12:45', expected_completion_date: '13:45' },
+] as any;
+
 // Componente de Visão Analítica com design elegante
 interface AnalyticsViewProps {
   summary: { delayed: number; alert: number; on_time: number };
@@ -663,22 +676,14 @@ interface AnalyticsViewProps {
 }
 
 const AnalyticsView = ({ summary, chamados }: AnalyticsViewProps) => {
-  const total = summary.delayed + summary.alert + summary.on_time;
-  
-  const pieData = [
-    { name: 'Atrasados', value: summary.delayed, color: 'url(#gradientRed)' },
-    { name: 'Alertas', value: summary.alert, color: 'url(#gradientAmber)' },
-    { name: 'No Prazo', value: summary.on_time, color: 'url(#gradientGreen)' },
-  ];
-
-  const radialData = [
-    { name: 'No Prazo', value: total > 0 ? (summary.on_time / total) * 100 : 0, fill: 'url(#gradientGreen)' },
-    { name: 'Alertas', value: total > 0 ? (summary.alert / total) * 100 : 0, fill: 'url(#gradientAmber)' },
-    { name: 'Atrasados', value: total > 0 ? (summary.delayed / total) * 100 : 0, fill: 'url(#gradientRed)' },
-  ];
+  // Usar dados mockados se não houver dados reais
+  const useMock = chamados.length === 0;
+  const displaySummary = useMock ? mockSummary : summary;
+  const displayChamados = useMock ? mockChamados : chamados;
+  const total = displaySummary.delayed + displaySummary.alert + displaySummary.on_time;
 
   // Agrupar por cliente
-  const clienteData = chamados.reduce((acc, call) => {
+  const clienteData = displayChamados.reduce((acc, call) => {
     const cliente = call.associado?.association || 'Não definido';
     if (!acc[cliente]) {
       acc[cliente] = { delayed: 0, alert: 0, on_time: 0 };
@@ -697,301 +702,246 @@ const AnalyticsView = ({ summary, chamados }: AnalyticsViewProps) => {
     total: data.delayed + data.alert + data.on_time,
   }));
 
-  // Gradients SVG definitions
-  const GradientDefs = () => (
-    <defs>
-      <linearGradient id="gradientRed" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stopColor="#f87171" />
-        <stop offset="100%" stopColor="#dc2626" />
-      </linearGradient>
-      <linearGradient id="gradientAmber" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stopColor="#fbbf24" />
-        <stop offset="100%" stopColor="#d97706" />
-      </linearGradient>
-      <linearGradient id="gradientGreen" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stopColor="#34d399" />
-        <stop offset="100%" stopColor="#059669" />
-      </linearGradient>
-      <linearGradient id="gradientPrimary" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stopColor="hsl(160, 100%, 37%)" />
-        <stop offset="100%" stopColor="hsl(160, 100%, 22%)" />
-      </linearGradient>
-      <filter id="glow">
-        <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
-        <feMerge>
-          <feMergeNode in="coloredBlur"/>
-          <feMergeNode in="SourceGraphic"/>
-        </feMerge>
-      </filter>
-    </defs>
-  );
+  // Dados para gráfico de linha (evolução por hora)
+  const lineData = [
+    { hora: '08h', atrasados: 2, alertas: 3, noPrazo: 12 },
+    { hora: '09h', atrasados: 3, alertas: 5, noPrazo: 18 },
+    { hora: '10h', atrasados: 5, alertas: 8, noPrazo: 25 },
+    { hora: '11h', atrasados: 4, alertas: 10, noPrazo: 32 },
+    { hora: '12h', atrasados: 6, alertas: 12, noPrazo: 38 },
+    { hora: '13h', atrasados: 8, alertas: 15, noPrazo: 42 },
+  ];
+
+  // Cores do tema (inspirado na referência)
+  const colors = {
+    primary: '#2563eb', // Azul
+    accent: '#ec4899', // Magenta/Rosa
+    success: '#10b981',
+    warning: '#f59e0b',
+    danger: '#ef4444',
+    gray: '#94a3b8',
+  };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Cards de métricas com glassmorphism */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Total Card */}
-        <Card className="relative overflow-hidden rounded-2xl border-0 bg-gradient-to-br from-slate-900 to-slate-800 shadow-2xl hover:shadow-3xl transition-all duration-500 hover:scale-[1.02] group">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-transparent opacity-50" />
-          <div className="absolute -top-10 -right-10 w-32 h-32 bg-primary/20 rounded-full blur-3xl group-hover:bg-primary/30 transition-colors" />
-          <CardContent className="p-6 relative">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-400 font-medium">Total de Chamados</p>
-                <p className="text-4xl font-bold text-white mt-1">{total}</p>
-                <p className="text-xs text-slate-500 mt-2">Ativos no momento</p>
-              </div>
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-primary/30 to-primary/10 backdrop-blur-sm">
-                <BarChart3 className="h-8 w-8 text-primary" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Atrasados Card */}
-        <Card className="relative overflow-hidden rounded-2xl border-0 bg-gradient-to-br from-red-950 to-red-900 shadow-2xl hover:shadow-red-500/20 transition-all duration-500 hover:scale-[1.02] group">
-          <div className="absolute inset-0 bg-gradient-to-br from-red-500/10 to-transparent" />
-          <div className="absolute -top-10 -right-10 w-32 h-32 bg-red-500/20 rounded-full blur-3xl group-hover:bg-red-500/30 transition-colors animate-pulse" />
-          <CardContent className="p-6 relative">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-red-300 font-medium">Atrasados</p>
-                <p className="text-4xl font-bold text-white mt-1">{summary.delayed}</p>
-                <div className="flex items-center gap-2 mt-2">
-                  <div className="h-1.5 w-16 bg-red-950 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-red-400 to-red-500 rounded-full transition-all duration-1000"
-                      style={{ width: `${total > 0 ? (summary.delayed / total) * 100 : 0}%` }}
-                    />
-                  </div>
-                  <span className="text-xs text-red-400">{total > 0 ? ((summary.delayed / total) * 100).toFixed(1) : 0}%</span>
-                </div>
-              </div>
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-red-500/30 to-red-600/10 backdrop-blur-sm">
-                <AlertCircle className="h-8 w-8 text-red-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Alertas Card */}
-        <Card className="relative overflow-hidden rounded-2xl border-0 bg-gradient-to-br from-amber-950 to-amber-900 shadow-2xl hover:shadow-amber-500/20 transition-all duration-500 hover:scale-[1.02] group">
-          <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-transparent" />
-          <div className="absolute -top-10 -right-10 w-32 h-32 bg-amber-500/20 rounded-full blur-3xl group-hover:bg-amber-500/30 transition-colors" />
-          <CardContent className="p-6 relative">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-amber-300 font-medium">Alertas</p>
-                <p className="text-4xl font-bold text-white mt-1">{summary.alert}</p>
-                <div className="flex items-center gap-2 mt-2">
-                  <div className="h-1.5 w-16 bg-amber-950 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-all duration-1000"
-                      style={{ width: `${total > 0 ? (summary.alert / total) * 100 : 0}%` }}
-                    />
-                  </div>
-                  <span className="text-xs text-amber-400">{total > 0 ? ((summary.alert / total) * 100).toFixed(1) : 0}%</span>
-                </div>
-              </div>
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-500/30 to-amber-600/10 backdrop-blur-sm">
-                <Clock className="h-8 w-8 text-amber-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* No Prazo Card */}
-        <Card className="relative overflow-hidden rounded-2xl border-0 bg-gradient-to-br from-emerald-950 to-emerald-900 shadow-2xl hover:shadow-emerald-500/20 transition-all duration-500 hover:scale-[1.02] group">
-          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-transparent" />
-          <div className="absolute -top-10 -right-10 w-32 h-32 bg-emerald-500/20 rounded-full blur-3xl group-hover:bg-emerald-500/30 transition-colors" />
-          <CardContent className="p-6 relative">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-emerald-300 font-medium">No Prazo</p>
-                <p className="text-4xl font-bold text-white mt-1">{summary.on_time}</p>
-                <div className="flex items-center gap-2 mt-2">
-                  <div className="h-1.5 w-16 bg-emerald-950 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full transition-all duration-1000"
-                      style={{ width: `${total > 0 ? (summary.on_time / total) * 100 : 0}%` }}
-                    />
-                  </div>
-                  <span className="text-xs text-emerald-400">{total > 0 ? ((summary.on_time / total) * 100).toFixed(1) : 0}%</span>
-                </div>
-              </div>
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-500/30 to-emerald-600/10 backdrop-blur-sm">
-                <Timer className="h-8 w-8 text-emerald-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Gráficos com efeitos */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Gráfico Radial Elegante */}
-        <Card className="relative overflow-hidden rounded-2xl border-0 bg-gradient-to-br from-slate-900 to-slate-800 shadow-2xl">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent" />
-          <CardContent className="p-6 relative">
-            <h3 className="text-lg font-semibold text-white mb-2">Distribuição por Status</h3>
-            <p className="text-sm text-slate-400 mb-4">Visão geral dos chamados ativos</p>
-            <div className="h-[320px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <GradientDefs />
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={70}
-                    outerRadius={110}
-                    paddingAngle={4}
-                    dataKey="value"
-                    stroke="none"
-                    animationBegin={0}
-                    animationDuration={1500}
-                  >
-                    {pieData.map((entry, index) => (
-                      <Cell 
-                        key={`cell-${index}`} 
-                        fill={entry.color}
-                        style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))' }}
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "rgba(15, 23, 42, 0.95)",
-                      border: "1px solid rgba(148, 163, 184, 0.2)",
-                      borderRadius: "16px",
-                      boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
-                      padding: "12px 16px",
-                    }}
-                    itemStyle={{ color: "#fff" }}
-                    labelStyle={{ color: "#94a3b8", marginBottom: "4px" }}
-                  />
-                  <Legend 
-                    verticalAlign="bottom"
-                    formatter={(value) => <span className="text-slate-300 text-sm">{value}</span>}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            {/* Centro do donut */}
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-[30%] text-center">
-              <p className="text-4xl font-bold text-white">{total}</p>
-              <p className="text-xs text-slate-400">Total</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Gráfico de Barras com Gradientes */}
-        <Card className="relative overflow-hidden rounded-2xl border-0 bg-gradient-to-br from-slate-900 to-slate-800 shadow-2xl">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent" />
-          <CardContent className="p-6 relative">
-            <h3 className="text-lg font-semibold text-white mb-2">Quantidade por Status</h3>
-            <p className="text-sm text-slate-400 mb-4">Comparativo visual de volume</p>
-            <div className="h-[320px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart 
-                  data={[
-                    { name: 'Atrasados', quantidade: summary.delayed },
-                    { name: 'Alertas', quantidade: summary.alert },
-                    { name: 'No Prazo', quantidade: summary.on_time },
-                  ]} 
-                  margin={{ top: 20, right: 20, left: 0, bottom: 20 }}
-                >
-                  <GradientDefs />
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.1)" vertical={false} />
-                  <XAxis 
-                    dataKey="name" 
-                    tick={{ fill: "#94a3b8", fontSize: 12 }}
-                    axisLine={{ stroke: "rgba(148, 163, 184, 0.2)" }}
-                    tickLine={false}
-                  />
-                  <YAxis 
-                    tick={{ fill: "#94a3b8", fontSize: 12 }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "rgba(15, 23, 42, 0.95)",
-                      border: "1px solid rgba(148, 163, 184, 0.2)",
-                      borderRadius: "16px",
-                      boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
-                    }}
-                    itemStyle={{ color: "#fff" }}
-                    cursor={{ fill: 'rgba(148, 163, 184, 0.05)' }}
-                  />
-                  <Bar 
-                    dataKey="quantidade" 
-                    radius={[12, 12, 0, 0]}
-                    animationDuration={1500}
-                  >
-                    <Cell fill="url(#gradientRed)" />
-                    <Cell fill="url(#gradientAmber)" />
-                    <Cell fill="url(#gradientGreen)" />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Gráfico por Cliente - Área com Gradiente */}
-      {clienteBarData.length > 0 && (
-        <Card className="relative overflow-hidden rounded-2xl border-0 bg-gradient-to-br from-slate-900 to-slate-800 shadow-2xl">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent" />
-          <CardContent className="p-6 relative">
-            <h3 className="text-lg font-semibold text-white mb-2">Chamados por Cliente</h3>
-            <p className="text-sm text-slate-400 mb-4">Distribuição detalhada por associação</p>
-            <div className="h-[380px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart 
-                  data={clienteBarData} 
-                  margin={{ top: 20, right: 20, left: 0, bottom: 20 }}
-                  barGap={4}
-                >
-                  <GradientDefs />
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.1)" vertical={false} />
-                  <XAxis 
-                    dataKey="name" 
-                    tick={{ fill: "#94a3b8", fontSize: 12 }}
-                    axisLine={{ stroke: "rgba(148, 163, 184, 0.2)" }}
-                    tickLine={false}
-                  />
-                  <YAxis 
-                    tick={{ fill: "#94a3b8", fontSize: 12 }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "rgba(15, 23, 42, 0.95)",
-                      border: "1px solid rgba(148, 163, 184, 0.2)",
-                      borderRadius: "16px",
-                      boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
-                    }}
-                    itemStyle={{ color: "#fff" }}
-                    cursor={{ fill: 'rgba(148, 163, 184, 0.05)' }}
-                  />
-                  <Legend 
-                    verticalAlign="top"
-                    align="right"
-                    wrapperStyle={{ paddingBottom: "20px" }}
-                    formatter={(value) => <span className="text-slate-300 text-sm">{value}</span>}
-                  />
-                  <Bar dataKey="Atrasados" fill="url(#gradientRed)" radius={[6, 6, 0, 0]} animationDuration={1500} />
-                  <Bar dataKey="Alertas" fill="url(#gradientAmber)" radius={[6, 6, 0, 0]} animationDuration={1500} />
-                  <Bar dataKey="No Prazo" fill="url(#gradientGreen)" radius={[6, 6, 0, 0]} animationDuration={1500} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+    <div className="space-y-6 animate-fade-in bg-slate-50 dark:bg-background -mx-6 -mb-6 px-6 pb-6 pt-2 min-h-[calc(100vh-200px)]">
+      {useMock && (
+        <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl p-3 text-center">
+          <p className="text-sm text-blue-600 dark:text-blue-400">📊 Exibindo dados de demonstração</p>
+        </div>
       )}
+      
+      {/* Layout principal em grid */}
+      <div className="grid grid-cols-12 gap-4">
+        {/* Coluna de métricas à esquerda */}
+        <div className="col-span-12 md:col-span-2 space-y-4">
+          {/* Card Total */}
+          <Card className="bg-white dark:bg-card border border-slate-200 dark:border-border rounded-xl shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-4 text-center">
+              <p className="text-3xl font-bold text-primary">{total}</p>
+              <p className="text-xs text-muted-foreground mt-1">Chamados</p>
+            </CardContent>
+          </Card>
+
+          {/* Card Atrasados */}
+          <Card className="bg-white dark:bg-card border border-slate-200 dark:border-border rounded-xl shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-4 text-center">
+              <p className="text-3xl font-bold" style={{ color: colors.accent }}>{displaySummary.delayed}</p>
+              <p className="text-xs text-muted-foreground mt-1">Atrasados</p>
+            </CardContent>
+          </Card>
+
+          {/* Card Alertas */}
+          <Card className="bg-white dark:bg-card border border-slate-200 dark:border-border rounded-xl shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-4 text-center">
+              <p className="text-3xl font-bold" style={{ color: colors.warning }}>{displaySummary.alert}</p>
+              <p className="text-xs text-muted-foreground mt-1">Alertas</p>
+            </CardContent>
+          </Card>
+
+          {/* Card No Prazo */}
+          <Card className="bg-white dark:bg-card border border-slate-200 dark:border-border rounded-xl shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-4 text-center">
+              <p className="text-3xl font-bold" style={{ color: colors.success }}>{displaySummary.on_time}</p>
+              <p className="text-xs text-muted-foreground mt-1">No Prazo</p>
+            </CardContent>
+          </Card>
+
+          {/* Card Percentual */}
+          <Card className="bg-white dark:bg-card border border-slate-200 dark:border-border rounded-xl shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-4 text-center">
+              <p className="text-3xl font-bold" style={{ color: colors.primary }}>
+                {total > 0 ? ((displaySummary.on_time / total) * 100).toFixed(0) : 0}%
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">Taxa Sucesso</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Área central com gráficos */}
+        <div className="col-span-12 md:col-span-7 space-y-4">
+          {/* Gráfico de Linha - Evolução */}
+          <Card className="bg-white dark:bg-card border border-slate-200 dark:border-border rounded-xl shadow-sm">
+            <CardContent className="p-5">
+              <h3 className="text-base font-semibold text-foreground mb-4">Evolução por Hora</h3>
+              <div className="h-[220px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={lineData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorNoPrazo" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={colors.primary} stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor={colors.primary} stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                    <XAxis dataKey="hora" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#fff',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                      }}
+                    />
+                    <Area type="monotone" dataKey="noPrazo" name="No Prazo" stroke={colors.primary} strokeWidth={2} fill="url(#colorNoPrazo)" />
+                    <Area type="monotone" dataKey="alertas" name="Alertas" stroke={colors.warning} strokeWidth={2} fill="transparent" />
+                    <Area type="monotone" dataKey="atrasados" name="Atrasados" stroke={colors.accent} strokeWidth={2} fill="transparent" />
+                  </AreaChart>
+                </ResponsiveContainer>
+            </div>
+            </CardContent>
+          </Card>
+
+          {/* Gráfico de Barras Horizontal - Por Cliente */}
+          <Card className="bg-white dark:bg-card border border-slate-200 dark:border-border rounded-xl shadow-sm">
+            <CardContent className="p-5">
+              <h3 className="text-base font-semibold text-foreground mb-4">Por Cliente</h3>
+              <div className="h-[200px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={clienteBarData} layout="vertical" margin={{ top: 5, right: 30, left: 50, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
+                    <XAxis type="number" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis dataKey="name" type="category" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} width={60} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#fff',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '8px',
+                      }}
+                    />
+                    <Bar dataKey="total" fill={colors.accent} radius={[0, 4, 4, 0]} barSize={20} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Coluna direita com gráficos de rosca */}
+        <div className="col-span-12 md:col-span-3 space-y-4">
+          {/* Gráfico de Rosca - Taxa de Sucesso */}
+          <Card className="bg-white dark:bg-card border border-slate-200 dark:border-border rounded-xl shadow-sm">
+            <CardContent className="p-5">
+              <h3 className="text-base font-semibold text-foreground mb-2">Taxa de Sucesso</h3>
+              <div className="h-[180px] relative">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'No Prazo', value: displaySummary.on_time },
+                        { name: 'Outros', value: displaySummary.delayed + displaySummary.alert },
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={70}
+                      dataKey="value"
+                      stroke="none"
+                    >
+                      <Cell fill={colors.accent} />
+                      <Cell fill="#e2e8f0" />
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-center">
+                    <p className="text-2xl font-bold" style={{ color: colors.accent }}>
+                      {total > 0 ? ((displaySummary.on_time / total) * 100).toFixed(0) : 0}%
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-center gap-4 mt-2">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: colors.accent }} />
+                  <span className="text-xs text-muted-foreground">No Prazo</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-slate-200" />
+                  <span className="text-xs text-muted-foreground">Outros</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Gráfico de Rosca - Distribuição */}
+          <Card className="bg-white dark:bg-card border border-slate-200 dark:border-border rounded-xl shadow-sm">
+            <CardContent className="p-5">
+              <h3 className="text-base font-semibold text-foreground mb-2">Distribuição</h3>
+              <div className="h-[180px] relative">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'Atrasados', value: displaySummary.delayed },
+                        { name: 'Alertas', value: displaySummary.alert },
+                        { name: 'No Prazo', value: displaySummary.on_time },
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={70}
+                      dataKey="value"
+                      stroke="none"
+                    >
+                      <Cell fill={colors.accent} />
+                      <Cell fill={colors.warning} />
+                      <Cell fill={colors.primary} />
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#fff',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '8px',
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-center">
+                    <p className="text-xl font-bold text-foreground">{total}</p>
+                    <p className="text-[10px] text-muted-foreground">Total</p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-wrap justify-center gap-3 mt-2">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: colors.accent }} />
+                  <span className="text-xs text-muted-foreground">Atrasados</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: colors.warning }} />
+                  <span className="text-xs text-muted-foreground">Alertas</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: colors.primary }} />
+                  <span className="text-xs text-muted-foreground">No Prazo</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 };
