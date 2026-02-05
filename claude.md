@@ -63,6 +63,75 @@ Este projeto front-end é **EXCLUSIVAMENTE** para gerenciamento de **GUINCHOS**.
 
 ---
 
+## 🆕 ATUALIZAÇÕES RECENTES
+
+### **04/02/2026 - Monitoramento em Tempo Real**
+
+#### **AcompanhamentoFullscreen.tsx**
+- ✅ Adicionada página de monitoramento fullscreen com atualização em tempo real
+- ✅ Campo `cliente` substituído por `associado` (inclui campo `association`)
+- ✅ **Labels de exibição na interface:**
+  - Campo API `associado.name` → Label **"Usuário"**
+  - Campo API `associado.association` → Label **"Cliente"**
+  - ⚠️ IMPORTANTE: Campo "Cliente" sempre visível, exibe "Não definida" quando null
+- ✅ **Filtro por Cliente (Associação)**
+  - Design moderno com chips coloridos e gradientes
+  - 5 opções: Todos, Solidy, Nova, Motoclub, Aprovel
+  - Cores: Solidy (verde), Nova (azul), Motoclub (laranja), Aprovel (ciano)
+  - Efeito visual de seleção (escala e sombra)
+  - Reset para página 1 ao mudar filtro
+  - Parâmetro `?association=` enviado para API
+- ✅ Sistema de áudio com sirene policial (Web Audio API)
+  - Som sintetizado usando osciladores (500Hz - 1200Hz)
+  - Reprodução de 2 segundos ao detectar NOVO chamado atrasado
+  - Detecção baseada em comparação de contadores (atual > anterior)
+  - Para automaticamente após 2 segundos
+  - Controle de mute/unmute
+- ✅ Integração com API `/api/calls/guinchos/open`
+  - Polling a cada 10 segundos
+  - Paginação (20 chamados por página)
+  - Campo `summary` com totais globais (delayed, alert, on_time)
+- ✅ Métricas de desempenho nos cards
+  - Distância do guincho (`towing_distance_km`)
+  - Tempo de chegada (`towing_arrival_time_minutes`)
+  - Duração do serviço (`service_duration`)
+  - Layout em grid 3 colunas com ícones coloridos
+- ✅ Contadores de status globais
+  - Usa `summary` da API (não conta apenas página atual)
+  - Total de atrasados, alertas e no prazo
+- ✅ Campos de data pré-formatados pela API
+  - `created_at`, `expected_arrival_date`, `expected_completion_date`
+  - Exibe "Não definida" quando null
+
+#### **DateRangeFilter.tsx**
+- ✅ Adicionado filtro por intervalo de datas no dashboard
+  - Dois calendários (data início e data fim)
+  - Validação: ambas as datas são obrigatórias
+  - Botões: Aplicar Filtro e Limpar
+- ✅ Botão "Acompanhamento" para abrir página fullscreen em nova aba
+  - Usa `window.open()` para garantir abertura em nova aba
+
+#### **InspectionsCard.tsx**
+- ✅ Navegação de fotos em checkin/checkout
+  - Botões Anterior/Próximo
+  - Contador de imagens (X / Total)
+  - Dialog compartilhado para evitar problemas de renderização
+
+#### **calls.service.ts**
+- ✅ Novas interfaces TypeScript
+  - `OpenCall`: Dados otimizados para monitoramento
+  - `OpenCallsResponse`: Resposta com data, pagination e summary
+- ✅ Novo método `getOpenCalls(page, limit)`
+  - Busca chamados em aberto para monitoramento
+  - Retorna summary com totais agregados
+
+#### **dashboard.service.ts**
+- ✅ Interface `DashboardFilters`
+  - Suporte para `start_date` e `end_date` (formato YYYY-MM-DD)
+- ✅ Método `getData()` atualizado para aceitar filtros opcionais
+
+---
+
 ## ⚙️ VARIÁVEIS DE AMBIENTE
 
 ### **📋 Configuração Inicial**
@@ -836,6 +905,61 @@ export interface CallsFilters {
 }
 
 // ============================================
+// INTERFACES - CHAMADOS EM ABERTO (Monitoramento)
+// ============================================
+export interface OpenCall {
+  id: string;
+  towing_status: string;
+  towing_service_type: string;
+  address: string;
+  associado: {
+    id: string;
+    name: string;
+    phone: string;
+    cpf: string;
+    association: string;  // Associação do associado (ex: "solidy", "nova")
+  } | null;
+  atendente: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
+  veiculo: {
+    id: string;
+    plate: string;
+    model: string;
+    brand: string;
+    color: string;
+    year: string;
+    category: string | null;
+  } | null;
+  motorista: {
+    id: string;
+    name: string;
+    phone: string;
+    status?: string;
+    profile_image_path?: string;
+  } | null;
+  created_at: string;                      // String pré-formatada pela API
+  expected_arrival_date: string | null;    // String pré-formatada ou null
+  expected_completion_date: string | null; // String pré-formatada ou null
+  towing_distance_km: number | null;       // Métrica: Distância em km
+  towing_arrival_time_minutes: number | null; // Métrica: Tempo de chegada em minutos
+  service_duration: string | null;         // Métrica: Duração do serviço (pré-formatada)
+  timeStatus: string;                      // "on_time" | "alert" | "delayed"
+}
+
+export interface OpenCallsResponse {
+  data: OpenCall[];
+  pagination: Pagination;
+  summary: {
+    delayed: number;   // Total de chamados atrasados (todas as páginas)
+    alert: number;     // Total de chamados em alerta (todas as páginas)
+    on_time: number;   // Total de chamados no prazo (todas as páginas)
+  };
+}
+
+// ============================================
 // LABELS & VARIANTS (UI)
 // ============================================
 export const callTowingStatusLabels: Record<CallTowingStatus, string> = {
@@ -869,6 +993,35 @@ export const callsService = {
     if (search && search.trim()) params.search = search.trim();
 
     const { data } = await api.get<CallsResponse>('/api/calls/guinchos', { params });
+    return data;
+  },
+
+  /**
+   * GET /api/calls/guinchos/open
+   * Busca chamados de guincho em aberto para monitoramento
+   * Retorna dados otimizados para a página de acompanhamento em tempo real
+   *
+   * @param page - Número da página (padrão: 1)
+   * @param limit - Quantidade de registros por página (padrão: 50)
+   * @param association - Filtro opcional por associação (solidy, nova, motoclub, aprovel, agsmb)
+   */
+  getOpenCalls: async (page: number = 1, limit: number = 50, association?: string): Promise<OpenCallsResponse> => {
+    const params: Record<string, string | number> = { page, limit };
+    if (association && association !== 'todos') {
+      params.association = association;
+    }
+    const { data } = await api.get<OpenCallsResponse>('/api/calls/guinchos/open', {
+      params,
+    });
+    return data;
+  },
+
+  /**
+   * GET /api/calls/guinchos/:id
+   * Busca um chamado específico por ID
+   */
+  getById: async (id: string): Promise<Call> => {
+    const { data } = await api.get<Call>(`/api/calls/guinchos/${id}`);
     return data;
   },
 };
@@ -3520,4 +3673,857 @@ attendancesByHour: AttendanceByHour[];
 **Versão do Projeto:** 1.0.0
 **Escopo:** **GUINCHO (Towing Services)** APENAS
 **Compatível com:** Node.js 20+, React 18+, Docker
+
+
+---
+
+## 🚨 PÁGINA DE ACOMPANHAMENTO FULLSCREEN
+
+### **AcompanhamentoFullscreen.tsx**
+
+Página dedicada ao monitoramento em tempo real de chamados, com alertas sonoros e visuais para acompanhamento contínuo.
+
+**Arquivo:** `src/pages/AcompanhamentoFullscreen.tsx`
+
+**Rota:** `/acompanhamento-fullscreen` (pública, sem autenticação)
+
+---
+
+### **🎵 Sistema de Áudio - Sirene de Alerta**
+
+A página reproduz automaticamente um som de sirene de polícia **quando detecta um novo chamado atrasado**, criando um ambiente de monitoramento ativo.
+
+#### **Funcionalidades do Áudio**
+
+- **Reprodução por detecção:** Som toca **APENAS 2 segundos** quando detecta novo chamado atrasado
+- **Detecção de novos chamados:** Compara `summary.delayed` atual com anterior
+  - Se contador aumentou → novo chamado atrasado detectado → toca sirene
+  - Som para automaticamente após 2 segundos
+- **Repetição no polling:** A cada 10 segundos, se houver novo atrasado, toca novamente
+- **Web Audio API:** Som sintetizado usando osciladores (sem arquivos externos)
+- **Padrão sonoro:** Sirene em padrão "Wail" (500Hz a 1200Hz)
+- **Volume ajustado:** 30% do volume máximo
+- **Controle de som:** Botão para mutar/desmutar no canto superior direito
+
+#### **Implementação - Web Audio API**
+
+```typescript
+const audioRef = useRef<HTMLAudioElement | null>(null);
+const [isMuted, setIsMuted] = useState(false);
+
+useEffect(() => {
+  const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+  const masterGain = audioContext.createGain();
+  masterGain.gain.value = 0.3; // Volume 30%
+  masterGain.connect(audioContext.destination);
+
+  let oscillator: OscillatorNode | null = null;
+  let gainNode: GainNode | null = null;
+  let isPlaying = false;
+
+  const startSirene = () => {
+    if (isPlaying) return;
+    isPlaying = true;
+
+    oscillator = audioContext.createOscillator();
+    oscillator.type = "triangle";
+
+    gainNode = audioContext.createGain();
+    gainNode.gain.value = 1;
+
+    oscillator.connect(gainNode);
+    gainNode.connect(masterGain);
+
+    oscillator.start();
+
+    // Padrão "Wail": 500Hz -> 1200Hz em 2.5s
+    const cycleDuration = 2.5;
+    const wail = () => {
+      if (!oscillator) return;
+
+      const now = audioContext.currentTime;
+      oscillator.frequency.setValueAtTime(500, now);
+      oscillator.frequency.linearRampToValueAtTime(1200, now + cycleDuration / 2);
+      oscillator.frequency.linearRampToValueAtTime(500, now + cycleDuration);
+
+      setTimeout(wail, cycleDuration * 1000);
+    };
+
+    wail();
+  };
+
+  const stopSirene = () => {
+    if (!isPlaying) return;
+    isPlaying = false;
+
+    if (oscillator) {
+      oscillator.stop();
+      oscillator.disconnect();
+      oscillator = null;
+    }
+  };
+
+  audioRef.current = {
+    play: startSirene,
+    pause: stopSirene,
+    isPlaying: () => isPlaying,
+  } as any;
+
+  return () => {
+    stopSirene();
+    audioContext.close();
+  };
+}, []);
+
+// Estado para rastrear contador anterior de chamados atrasados
+const [previousDelayedCount, setPreviousDelayedCount] = useState(0);
+
+// Controlar som baseado em NOVOS chamados atrasados
+useEffect(() => {
+  const currentDelayed = summary.delayed;
+
+  // Verificar se há um novo chamado atrasado (contador aumentou)
+  const hasNewDelayed = currentDelayed > previousDelayedCount;
+
+  if (audioRef.current && hasNewDelayed && !isMuted) {
+    const audio = audioRef.current as any;
+
+    try {
+      // Tocar o som
+      audio.play();
+
+      // Parar após 2 segundos
+      setTimeout(() => {
+        if (audio.isPlaying()) {
+          audio.pause();
+        }
+      }, 2000);
+    } catch (error) {
+      console.log("Não foi possível iniciar o som automaticamente.");
+    }
+  }
+
+  // Atualizar o contador anterior
+  setPreviousDelayedCount(currentDelayed);
+}, [summary.delayed, isMuted]);
+```
+
+**Características do Som:**
+- **Tipo de onda:** Triangle (mais suave que square)
+- **Frequência base:** 500Hz
+- **Frequência alta:** 1200Hz
+- **Duração do ciclo:** 2.5 segundos (subida + descida)
+- **Padrão:** "Wail" policial clássico
+
+---
+
+### **📡 Integração com API**
+
+A página consome dados em tempo real da API de chamados abertos.
+
+#### **Endpoint Utilizado**
+
+```
+GET http://localhost:3001/api/calls/guinchos/open?page=1&limit=20
+```
+
+#### **Serviço**
+
+```typescript
+// src/services/calls.service.ts
+getOpenCalls: async (page: number = 1, limit: number = 50): Promise<OpenCallsResponse> => {
+  const { data } = await api.get<OpenCallsResponse>('/api/calls/guinchos/open', {
+    params: { page, limit },
+  });
+  return data;
+}
+```
+
+#### **Filtro por Cliente**
+
+A tela possui um filtro visual elegante para filtrar chamados por associação (cliente):
+
+**Design:**
+- Card com gradiente sutil e sombra suave
+- Chips/botões com gradientes coloridos para cada associação
+- Efeito de escala e sombra no botão selecionado
+- Transições suaves entre estados
+
+**Opções de Filtro:**
+| Valor | Label | Cor | Endpoint |
+|-------|-------|-----|----------|
+| `todos` | Todos | Cinza (Slate) | Sem parâmetro |
+| `solidy` | Solidy | Verde | `?association=solidy` |
+| `nova` | Nova | Azul | `?association=nova` |
+| `motoclub` | Motoclub | Laranja | `?association=motoclub` |
+| `aprovel` | Aprovel | Ciano (Teal) | `?association=aprovel` |
+
+**Comportamento:**
+- Ao selecionar um filtro, volta para a página 1
+- Mantém o filtro durante o polling (10s)
+- Visual claro do filtro ativo (escala maior, sombra destacada)
+
+**Esquema de Cores Detalhado:**
+
+Cada associação possui um gradiente único para fácil identificação visual:
+
+```typescript
+const associations = [
+  {
+    value: 'todos',
+    label: 'Todos',
+    color: 'bg-gradient-to-r from-slate-500 to-slate-600 hover:from-slate-600 hover:to-slate-700'
+  },
+  {
+    value: 'solidy',
+    label: 'Solidy',
+    color: 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700'
+  },
+  {
+    value: 'nova',
+    label: 'Nova',
+    color: 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700'
+  },
+  {
+    value: 'motoclub',
+    label: 'Motoclub',
+    color: 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700'
+  },
+  {
+    value: 'aprovel',
+    label: 'Aprovel',
+    color: 'bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700'
+  },
+];
+```
+
+**Paleta de Cores:**
+
+| Associação | Cor Base | Cor Hover | Hex Base | Descrição |
+|------------|----------|-----------|----------|-----------|
+| Todos | Slate 500 | Slate 600 | #64748b | Cinza neutro |
+| Solidy | Green 500 | Green 600 | #22c55e | Verde vibrante |
+| Nova | Blue 500 | Blue 600 | #3b82f6 | Azul confiável |
+| Motoclub | Orange 500 | Orange 600 | #f97316 | Laranja energético |
+| Aprovel | Teal 500 | Teal 600 | #14b8a6 | Ciano moderno |
+
+**Estados Visuais:**
+
+```css
+/* Estado Não Selecionado */
+- Background: bg-background/80
+- Texto: text-muted-foreground
+- Borda: border-border/50 (2px)
+- Hover: border-border + bg-background
+
+/* Estado Selecionado */
+- Background: Gradiente específico da associação
+- Texto: text-white
+- Borda: border-transparent (2px)
+- Escala: scale-105 (5% maior)
+- Sombra: shadow-lg (sombra destacada)
+```
+
+**Implementação:**
+```typescript
+const [selectedAssociation, setSelectedAssociation] = useState<string>('todos');
+
+// Ao buscar dados
+const response = await callsService.getOpenCalls(currentPage, perPage, selectedAssociation);
+
+// Ao clicar no filtro
+onClick={() => {
+  setSelectedAssociation(association.value);
+  setCurrentPage(1); // Reset para primeira página
+}}
+
+// Classes CSS condicionais
+className={cn(
+  "px-4 py-2 rounded-xl font-medium text-sm transition-all duration-200 transform",
+  "border-2 shadow-md",
+  selectedAssociation === association.value
+    ? `${association.color} text-white border-transparent scale-105 shadow-lg`
+    : "bg-background/80 text-muted-foreground border-border/50 hover:border-border hover:bg-background"
+)}
+```
+
+**Exemplo Visual do Filtro:**
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│ 🏢 Filtrar por Cliente:                                        │
+│                                                                 │
+│  ┌─────────┐ ┌──────────┐ ┌────────┐ ┌──────────┐ ┌─────────┐ │
+│  │ Todos   │ │ Solidy   │ │ Nova   │ │ Motoclub │ │ Aprovel │ │
+│  │ Cinza   │ │ Verde    │ │ Azul   │ │ Laranja  │ │ Ciano   │ │
+│  └─────────┘ └──────────┘ └────────┘ └──────────┘ └─────────┘ │
+│      ↑            ↑            ↑           ↑            ↑       │
+│   Normal      Selecionado    Normal     Normal      Normal     │
+│   (escala      (escala      (escala    (escala     (escala     │
+│    100%)       105%)         100%)      100%)       100%)       │
+└────────────────────────────────────────────────────────────────┘
+```
+
+**Fluxo de Interação:**
+
+```
+Usuário clica em "Solidy"
+    ↓
+setSelectedAssociation('solidy')
+setCurrentPage(1)
+    ↓
+useEffect detecta mudança
+    ↓
+Busca: GET /api/calls/guinchos/open?page=1&limit=20&association=solidy
+    ↓
+Exibe apenas chamados da Solidy
+    ↓
+Botão "Solidy" fica em destaque:
+  - Gradiente verde (green-500 → green-600)
+  - Escala 105%
+  - Sombra destacada
+  - Texto branco
+```
+
+#### **Atualização Automática**
+
+- Busca inicial ao carregar a página
+- Atualização automática a cada **10 segundos** (polling)
+- Mantém a página atual e filtro selecionado durante atualizações
+- Estados de loading e error com feedback visual
+- Som da sirene toca **por 2 segundos** ao detectar novo chamado atrasado
+  - Compara `summary.delayed` atual com anterior
+  - Se aumentou: toca sirene por 2 segundos e para automaticamente
+  - A cada polling, repete o processo de detecção
+
+#### **Paginação**
+
+A tela possui controles de paginação completos:
+
+**Configuração:**
+- **20 chamados por página** (configurável via `perPage`)
+- Botões "Anterior" e "Próximo"
+- Indicador de página atual e total de páginas
+- Contador de registros (mostrando X a Y de Z chamados)
+- Botões desabilitados quando não aplicável
+
+**Implementação:**
+```typescript
+const [currentPage, setCurrentPage] = useState(1);
+const [pagination, setPagination] = useState<Pagination | null>(null);
+const perPage = 20;
+
+useEffect(() => {
+  const fetchChamados = async () => {
+    const response = await callsService.getOpenCalls(currentPage, perPage);
+    setChamados(response.data);
+    setPagination(response.pagination);
+  };
+  fetchChamados();
+}, [currentPage]);
+```
+
+**Navegação:**
+- `handlePreviousPage()` - Volta uma página
+- `handleNextPage()` - Avança uma página
+- Desabilitado durante loading
+- Desabilitado na primeira/última página
+
+#### **Mapeamento de Dados**
+
+Dados da API são mapeados para o formato da interface:
+
+| Campo API | Uso na Interface |
+|-----------|------------------|
+| `associado.name` | **Label "Usuário"** - Nome do usuário no card |
+| `associado.association` | **Label "Cliente"** - Associação (uppercase), exibe "Não definida" se null |
+| `atendente?.name` | Nome do atendente (ou "Sem atendente") |
+| `veiculo` | Formatado como "Marca Modelo - Placa" |
+| `created_at` | Data/hora de início do chamado (string pré-formatada) |
+| `expected_arrival_date` | Previsão de chegada do motorista (string pré-formatada ou null) |
+| `expected_completion_date` | Previsão de conclusão do serviço (string pré-formatada ou null) |
+| `timeStatus` | Status do tempo (`on_time`, `alert`, `delayed`) |
+| `towing_distance_km` | Distância do guincho em km (métrica) |
+| `towing_arrival_time_minutes` | Tempo de chegada em minutos (métrica) |
+| `service_duration` | Duração do serviço (métrica, string pré-formatada) |
+
+**Função helper:**
+```typescript
+const formatVehicle = (call: OpenCall): string => {
+  if (!call.veiculo) return "Veículo não informado";
+  const { brand, model, plate } = call.veiculo;
+  return `${brand} ${model} - ${plate}`;
+};
+```
+
+#### **⚠️ Labels de Exibição vs Campos da API**
+
+**IMPORTANTE:** Os nomes dos campos na API são diferentes das labels exibidas na interface:
+
+| Campo na API | Label Exibida | Nota |
+|--------------|---------------|------|
+| `associado.name` | **"Usuário"** | Nome da pessoa |
+| `associado.association` | **"Cliente"** | Nome da associação (Solidy, Nova, etc.) |
+
+**Exemplo de código:**
+```typescript
+{/* Campo API: associado.name */}
+<p className="text-xs text-muted-foreground">Usuário</p>
+<p className="font-semibold text-sm truncate">
+  {call.associado?.name || "Usuário não informado"}
+</p>
+
+{/* Campo API: associado.association */}
+<p className="text-xs text-muted-foreground">Cliente</p>
+<p className={cn(
+  "font-semibold text-sm truncate uppercase",
+  !call.associado?.association && "text-muted-foreground italic normal-case"
+)}>
+  {call.associado?.association || "Não definida"}
+</p>
+```
+
+**Comportamento do campo "Cliente":**
+- ✅ Sempre visível (não condicional)
+- ✅ Com valor: UPPERCASE (SOLIDY, NOVA, MOTOCLUB, APROVEL, AGSMB)
+- ✅ Valor null: "Não definida" (itálico, cor clara, lowercase)
+
+#### **Campos de Data nos Cards**
+
+Cada card exibe **3 campos de data obrigatórios** (sempre visíveis):
+
+1. **Início** (`created_at`)
+   - Quando o chamado foi criado
+   - Sempre tem valor
+   - Formato: String pré-formatada pela API (ex: "04/02/2026, 18:12:11")
+   - **Importante:** Não aplicar `formatDateTime()` - API já retorna formatado
+
+2. **Prev. Chegada** (`expected_arrival_date`)
+   - Quando o motorista deve chegar ao local
+   - Exibe "Não definida" se for `null`
+   - Formato: String pré-formatada pela API quando disponível
+   - Estilo: Itálico e texto mais claro quando null
+
+3. **Prev. Conclusão** (`expected_completion_date`)
+   - Quando o serviço deve ser concluído
+   - Exibe "Não definida" se for `null`
+   - Formato: String pré-formatada pela API quando disponível
+   - Estilo: Itálico e texto mais claro quando null
+
+**Exemplo no Card:**
+```
+📅 Início: 04/02/2026, 18:12:11
+🕐 Prev. Chegada: 04/02/2026, 19:00:00
+🕐 Prev. Conclusão: Não definida
+```
+
+**Implementação:**
+```typescript
+<div className="flex items-center gap-1 text-xs shrink-0">
+  <Clock className="h-3 w-3 text-muted-foreground shrink-0" />
+  <span className="text-muted-foreground shrink-0">Prev. Chegada:</span>
+  <span className={cn(
+    "font-medium truncate",
+    !call.expected_arrival_date && "text-muted-foreground italic"
+  )}>
+    {call.expected_arrival_date || "Não definida"}
+  </span>
+</div>
+```
+
+**Nota Importante:**
+- **NÃO** use `formatDateTime()` nos campos de data desta tela
+- A API retorna strings já formatadas no padrão brasileiro
+- Usar formatação adicional causará erros ou formatação duplicada
+
+#### **Métricas de Desempenho nos Cards**
+
+Cada card pode exibir até **3 métricas de desempenho** quando disponíveis:
+
+1. **Distância** (`towing_distance_km`)
+   - Distância do guincho em quilômetros
+   - Ícone: RouteIcon (azul)
+   - Formato: `{valor} km`
+   - Condicional: Só exibe se houver valor
+
+2. **Tempo de Chegada** (`towing_arrival_time_minutes`)
+   - Tempo estimado de chegada do guincho em minutos
+   - Ícone: Timer (laranja)
+   - Formato: `{valor} min`
+   - Condicional: Só exibe se valor não for `null` ou `undefined`
+
+3. **Duração do Serviço** (`service_duration`)
+   - Tempo total do serviço
+   - Ícone: Wrench (roxo)
+   - Formato: String pré-formatada pela API
+   - Condicional: Só exibe se houver valor
+
+**Layout:**
+- Grid de 3 colunas responsivo
+- Cada métrica em card individual com fundo `bg-muted/50`
+- Seção separada por borda superior
+- Só aparece se pelo menos uma métrica existir
+
+**Implementação:**
+```typescript
+{(call.towing_distance_km || call.towing_arrival_time_minutes || call.service_duration) && (
+  <div className="pt-3 border-t border-border">
+    <div className="grid grid-cols-3 gap-2">
+      {call.towing_distance_km && (
+        <div className="flex flex-col items-center gap-1 p-2 rounded-lg bg-muted/50">
+          <RouteIcon className="h-3.5 w-3.5 text-blue-500" />
+          <span className="text-xs font-semibold">{call.towing_distance_km} km</span>
+          <span className="text-[10px] text-muted-foreground">Distância</span>
+        </div>
+      )}
+      {call.towing_arrival_time_minutes !== null && call.towing_arrival_time_minutes !== undefined && (
+        <div className="flex flex-col items-center gap-1 p-2 rounded-lg bg-muted/50">
+          <Timer className="h-3.5 w-3.5 text-orange-500" />
+          <span className="text-xs font-semibold">{call.towing_arrival_time_minutes} min</span>
+          <span className="text-[10px] text-muted-foreground">Chegada</span>
+        </div>
+      )}
+      {call.service_duration && (
+        <div className="flex flex-col items-center gap-1 p-2 rounded-lg bg-muted/50">
+          <Wrench className="h-3.5 w-3.5 text-purple-500" />
+          <span className="text-xs font-semibold">{call.service_duration}</span>
+          <span className="text-[10px] text-muted-foreground">Serviço</span>
+        </div>
+      )}
+    </div>
+  </div>
+)}
+```
+
+**Mapeamento da API:**
+
+| Campo API | Tipo | Descrição | Formatação Frontend |
+|-----------|------|-----------|---------------------|
+| `towing_distance_km` | `number \| null` | Distância do guincho em km | `{valor} km` |
+| `towing_arrival_time_minutes` | `number \| null` | Tempo de chegada em minutos | `{valor} min` |
+| `service_duration` | `string \| null` | Duração do serviço | String direta (pré-formatada) |
+
+---
+
+### **🎨 Interface Visual**
+
+#### **Status de Chamados**
+
+A página exibe cards coloridos baseados no status de tempo:
+
+| Status | Cor | Descrição |
+|--------|-----|-----------|
+| **Atrasado** | Vermelho | Chamados que ultrapassaram o prazo estimado |
+| **Alerta** | Amarelo/Âmbar | Chamados próximos ao prazo ou sem previsão |
+| **No Prazo** | Verde | Chamados dentro do tempo esperado |
+
+#### **Estrutura dos Cards**
+
+Cada card de chamado exibe as seguintes informações na ordem:
+
+**1. Badge de Status** (canto superior direito)
+- "ATRASADO" (vermelho) / "ALERTA" (amarelo) / "NO PRAZO" (verde)
+
+**2. Seção de Identificação:**
+
+| Campo | Label Exibida | Campo API | Ícone | Fallback |
+|-------|---------------|-----------|-------|----------|
+| **Usuário** | "Usuário" | `associado.name` | User | "Usuário não informado" |
+| **Cliente** | "Cliente" | `associado.association` | Building2 | "Não definida" |
+| **Atendente** | "Atendente" | `atendente?.name` | User | "Sem atendente" |
+
+**3. Seção de Veículo:**
+
+| Campo | Label Exibida | Campo API | Formato |
+|-------|---------------|-----------|---------|
+| **Veículo** | "Veículo" | `veiculo` | "MARCA MODELO - PLACA" ou "Veículo não informado" |
+
+**4. Seção de Datas:** (sempre visíveis)
+
+| Campo | Label Exibida | Campo API | Formato | Fallback |
+|-------|---------------|-----------|---------|----------|
+| **Início** | "Início:" | `created_at` | String API | - |
+| **Prev. Chegada** | "Prev. Chegada:" | `expected_arrival_date` | String API | "Não definida" |
+| **Prev. Conclusão** | "Prev. Conclusão:" | `expected_completion_date` | String API | "Não definida" |
+
+**5. Seção de Métricas** (condicional - só aparece se houver pelo menos uma métrica):
+
+| Métrica | Label Exibida | Campo API | Ícone | Cor |
+|---------|---------------|-----------|-------|-----|
+| **Distância** | "Distância" | `towing_distance_km` | RouteIcon | Azul |
+| **Chegada** | "Chegada" | `towing_arrival_time_minutes` | Timer | Laranja |
+| **Serviço** | "Serviço" | `service_duration` | Wrench | Roxo |
+
+**Regras de Exibição:**
+
+- ✅ **Campo "Cliente":** Sempre visível (mesmo quando null)
+  - Com valor: Exibe em UPPERCASE (ex: SOLIDY, NOVA, MOTOCLUB)
+  - Valor null: Exibe "Não definida" em itálico e cor mais clara
+
+- ✅ **Campos de Data:** Sempre visíveis
+  - API retorna strings pré-formatadas (ex: "04/02/2026, 18:12:11")
+  - **NÃO** aplicar `formatDateTime()` - usar string direta
+  - Quando null: Exibe "Não definida" em itálico
+
+- ✅ **Métricas:** Renderização condicional
+  - Só exibe a seção se pelo menos uma métrica existir
+  - Cada métrica individual só aparece se tiver valor
+  - Layout: Grid 3 colunas responsivo
+
+**Exemplo Visual:**
+
+```
+┌─────────────────────────────────┐
+│                    [NO PRAZO] ←──┤ Badge
+├─────────────────────────────────┤
+│ 👤 Usuário                       │
+│    ERIVELTON AGUIAR             │
+├─────────────────────────────────┤
+│ 🏢 Cliente                       │
+│    SOLIDY                        │ (ou "Não definida")
+├─────────────────────────────────┤
+│ 👨‍💼 Atendente                    │
+│    João Silva                    │
+├─────────────────────────────────┤
+│ 🚗 Veículo                       │
+│    FIAT UNO - ABC-1234          │
+├─────────────────────────────────┤
+│ 📅 Início:                       │
+│    04/02/2026, 18:12:11         │
+│ 🕐 Prev. Chegada:                │
+│    04/02/2026, 19:00:00         │
+│ 🕐 Prev. Conclusão:              │
+│    Não definida                  │
+├─────────────────────────────────┤
+│ ┌─────┐ ┌─────┐ ┌─────┐        │ Métricas
+│ │15 km│ │30min│ │45min│        │ (condicional)
+│ └─────┘ └─────┘ └─────┘        │
+└─────────────────────────────────┘
+```
+
+#### **Funcionalidades**
+
+- **Relógio em tempo real:** Atualizado a cada segundo
+- **Modo fullscreen:** Botão para entrar/sair do modo tela cheia
+- **Contadores de status:** Resumo de quantos chamados em cada status (usa `summary` da API)
+- **Grid responsivo:** Adaptação automática do layout baseado no tamanho da tela
+- **Atualização automática:** Interface atualiza em tempo real
+
+#### **Contadores de Status**
+
+Os contadores no topo da tela exibem o **total de chamados em cada status** de toda a base, não apenas da página atual.
+
+**Fonte dos Dados:**
+- A API retorna um campo `summary` na resposta com totais agregados
+- **NÃO** conta os chamados da página atual (evita números incorretos)
+- Reflete o estado global do sistema
+
+**Estrutura da Resposta da API:**
+```typescript
+interface OpenCallsResponse {
+  data: OpenCall[];
+  pagination: Pagination;
+  summary: {
+    delayed: number;   // Total de chamados atrasados (todas as páginas)
+    alert: number;     // Total de chamados em alerta (todas as páginas)
+    on_time: number;   // Total de chamados no prazo (todas as páginas)
+  };
+}
+
+interface OpenCall {
+  id: string;
+  towing_status: string;
+  towing_service_type: string;
+  address: string;
+  associado: {
+    id: string;
+    name: string;
+    phone: string;
+    cpf: string;
+    association: string;  // Associação (ex: "solidy", "nova", "motoclub")
+  } | null;
+  atendente: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
+  veiculo: {
+    id: string;
+    plate: string;
+    model: string;
+    brand: string;
+    color: string;
+    year: string;
+    category: string | null;
+  } | null;
+  motorista: {
+    id: string;
+    name: string;
+    phone: string;
+    status?: string;
+    profile_image_path?: string;
+  } | null;
+  created_at: string;                      // String pré-formatada (ex: "04/02/2026, 18:12:11")
+  expected_arrival_date: string | null;    // String pré-formatada ou null
+  expected_completion_date: string | null; // String pré-formatada ou null
+  towing_distance_km: number | null;       // Distância em km (métrica)
+  towing_arrival_time_minutes: number | null; // Tempo de chegada em minutos (métrica)
+  service_duration: string | null;         // Duração do serviço pré-formatada (métrica)
+  timeStatus: string;                      // "on_time" | "alert" | "delayed"
+}
+```
+
+**Implementação:**
+```typescript
+const [summary, setSummary] = useState({ delayed: 0, alert: 0, on_time: 0 });
+
+useEffect(() => {
+  const fetchChamados = async () => {
+    const response = await callsService.getOpenCalls(currentPage, perPage);
+    setChamados(response.data);
+    setPagination(response.pagination);
+    setSummary(response.summary); // ← Atualiza contadores globais
+  };
+
+  fetchChamados();
+  const interval = setInterval(fetchChamados, 10000); // Polling a cada 10s
+  return () => clearInterval(interval);
+}, [currentPage]);
+
+// Usar summary nos contadores
+const delayedCount = summary.delayed;
+const alertCount = summary.alert;
+const normalCount = summary.on_time;
+```
+
+**Exemplo:**
+- Página mostrando: 1 a 20 de 29.773 chamados
+- Contadores: 2 Atrasados • 0 Alertas • 29.771 No prazo
+- ✅ Total correto: 2 + 0 + 29.771 = 29.773
+
+---
+
+### **📊 Estrutura de Dados**
+
+```typescript
+interface AcompanhamentoItem {
+  id: string;
+  clientName: string;        // Nome do cliente
+  userName: string;           // Nome do atendente
+  vehicle: string;            // Modelo e placa do veículo
+  startDate: string;          // Data/hora de início
+  estimatedEndDate: string | null;  // Previsão de término
+  timeStatus: "normal" | "alert" | "delayed";  // Status do tempo
+}
+```
+
+---
+
+### **🔊 Controle de Som**
+
+**Botão de Controle:**
+- Localização: Canto superior direito, ao lado do botão fullscreen
+- Ícone muted: `VolumeX` (vermelho/destructive)
+- Ícone playing: `Volume2` (padrão)
+- Tooltip: "Ativar Som" / "Desativar Som"
+
+**Estados:**
+- `isMuted = false`: Som tocando, ícone Volume2
+- `isMuted = true`: Som pausado, ícone VolumeX
+
+---
+
+### **🚀 Acesso à Página**
+
+A página pode ser acessada de duas formas:
+
+1. **Via botão no Dashboard:**
+   - Componente `DateRangeFilter` possui botão "Acompanhamento"
+   - Abre em nova aba usando `window.open()`
+
+2. **Via URL direta:**
+   - Navegue para `/acompanhamento-fullscreen`
+   - Não requer autenticação (rota pública)
+
+---
+
+### **⚙️ Configuração da Rota**
+
+```typescript
+// src/App.tsx
+<Route path="/acompanhamento-fullscreen" element={<AcompanhamentoFullscreen />} />
+```
+
+**Nota:** Rota está **fora** do `<ProtectedRoute>`, permitindo acesso sem login para uso em monitores dedicados.
+
+---
+
+### **📝 Resumo das Funcionalidades**
+
+#### **✨ Principais Recursos**
+
+1. **Monitoramento em Tempo Real**
+   - Polling a cada 10 segundos
+   - Atualização automática de dados
+   - Indicador de loading durante busca
+
+2. **Alertas Sonoros Inteligentes**
+   - Som de sirene policial (Web Audio API)
+   - Toca **APENAS** quando há chamados atrasados
+   - Padrão "Wail": 500Hz → 1200Hz em 2.5s
+   - Controle mute/unmute
+
+3. **Sistema de Paginação**
+   - 20 chamados por página
+   - Navegação anterior/próxima
+   - Contador de registros e páginas
+   - Mantém página durante polling
+
+4. **Contadores Globais**
+   - Total de atrasados (vermelho)
+   - Total de alertas (amarelo)
+   - Total no prazo (verde)
+   - Usa `summary` da API (não conta página atual)
+
+5. **Métricas de Desempenho**
+   - Distância do guincho (km)
+   - Tempo de chegada (minutos)
+   - Duração do serviço
+   - Grid 3 colunas com ícones coloridos
+
+6. **Interface Visual**
+   - Cards coloridos por status (vermelho/amarelo/verde)
+   - Relógio em tempo real
+   - Modo fullscreen
+   - Grid responsivo (1-5 colunas)
+
+#### **🔄 Fluxo de Dados**
+
+```
+API Response (a cada 10s)
+    ↓
+OpenCallsResponse
+    ├── data: OpenCall[] → Grid de cards
+    ├── pagination → Controles de página
+    └── summary → Contadores globais + controle de áudio
+```
+
+#### **⚠️ Pontos Importantes**
+
+- ✅ **Datas já formatadas:** API retorna strings prontas, **NÃO** usar `formatDateTime()`
+- ✅ **Métricas condicionais:** Só exibe se houver pelo menos uma métrica disponível
+- ✅ **Som condicional:** Só toca quando `summary.delayed > 0`
+- ✅ **Contadores corretos:** Usa `summary` da API, não conta items da página
+- ✅ **Campos sempre visíveis:** `expected_arrival_date` e `expected_completion_date` mostram "Não definida" quando null
+
+#### **📦 Arquivos Relacionados**
+
+| Arquivo | Responsabilidade |
+|---------|------------------|
+| `src/pages/AcompanhamentoFullscreen.tsx` | Componente principal da página |
+| `src/services/calls.service.ts` | Serviço com `getOpenCalls()` e interfaces |
+| `src/App.tsx` | Rota `/acompanhamento-fullscreen` (pública) |
+| `src/components/dashboard/DateRangeFilter.tsx` | Botão "Acompanhamento" para abrir em nova aba |
+
+---
 

@@ -332,6 +332,60 @@ export interface CallsResponse {
   pagination: Pagination;
 }
 
+export interface OpenCall {
+  id: string;
+  towing_status: string;
+  towing_service_type: string;
+  address: string;
+  associado: {
+    id: string;
+    name: string;
+    phone: string;
+    cpf: string;
+    association: string;
+  } | null;
+  atendente: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
+  veiculo: {
+    id: string;
+    plate: string;
+    model: string;
+    brand: string;
+    color: string;
+    year: string;
+    category: string | null;
+  } | null;
+  motorista: {
+    id: string;
+    name: string;
+    phone: string;
+    status?: string;
+    profile_image_path?: string;
+  } | null;
+  created_at: string;
+  expected_arrival_date: string | null;
+  expected_completion_date: string | null;
+  arrival_duration: string | null;
+  service_duration: string | null;
+  total_distance: string | null;
+  towing_arrival_time_minutes: number | null;
+  towing_distance_km: number | null;
+  timeStatus: string;
+}
+
+export interface OpenCallsResponse {
+  data: OpenCall[];
+  pagination: Pagination;
+  summary: {
+    delayed: number;
+    alert: number;
+    on_time: number;
+  };
+}
+
 // ============================================
 // LABELS E CONFIGURAÇÕES
 // ============================================
@@ -584,6 +638,21 @@ export const callsService = {
    */
   createTowingCall: async (payload: CreateTowingCallPayload): Promise<Call> => {
     const { data } = await api.post<Call>('/api/calls/guinchos', payload);
+    return data;
+  },
+
+  /**
+   * GET /api/calls/guinchos/open
+   * Busca chamados em aberto para monitoramento
+   */
+  getOpenCalls: async (page: number = 1, limit: number = 50, association?: string): Promise<OpenCallsResponse> => {
+    const params: Record<string, string | number> = { page, limit };
+    if (association && association !== 'todos') {
+      params.association = association;
+    }
+    const { data } = await api.get<OpenCallsResponse>('/api/calls/guinchos/open', {
+      params,
+    });
     return data;
   },
 };

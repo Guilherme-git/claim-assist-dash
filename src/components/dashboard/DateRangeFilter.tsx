@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Calendar as CalendarIcon, X, Eye } from "lucide-react";
@@ -15,7 +14,6 @@ interface DateRangeFilterProps {
 }
 
 export function DateRangeFilter({ onFilter, onClear }: DateRangeFilterProps) {
-  const navigate = useNavigate();
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
 
@@ -126,7 +124,7 @@ export function DateRangeFilter({ onFilter, onClear }: DateRangeFilterProps) {
           )}
 
           <Button
-            onClick={() => navigate("/acompanhamento-fullscreen")}
+            onClick={() => window.open("/acompanhamento-fullscreen", "_blank")}
             variant="outline"
             size="sm"
             className="rounded-xl gap-2"
