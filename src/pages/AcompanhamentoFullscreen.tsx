@@ -1172,28 +1172,71 @@ const AnalyticsView = ({}: AnalyticsViewProps) => {
           </Card>
 
           {/* Gráfico de Barras Horizontal - Por Cliente */}
-          <Card className="bg-white dark:bg-card border border-slate-200 dark:border-border rounded-xl shadow-sm">
-            <CardContent className="p-5">
-              <h3 className="text-base font-semibold text-foreground mb-4">Por Cliente</h3>
-              <div className="h-[200px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={associationData} layout="vertical" margin={{ top: 5, right: 30, left: 50, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
-                    <XAxis type="number" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <YAxis dataKey="name" type="category" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} width={60} />
-                    <RechartsTooltip
-                      contentStyle={{
-                        backgroundColor: '#fff',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '8px',
-                      }}
+          {/* Cards por Cliente */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {associationData.map((client) => {
+              // Definir cor da borda baseado no nome do cliente
+              const clientColors: Record<string, { border: string; accent: string }> = {
+                'Solidy': { border: '#22c55e', accent: '#22c55e' },
+                'Nova': { border: '#3b82f6', accent: '#3b82f6' },
+                'Motoclub': { border: '#f97316', accent: '#f97316' },
+                'Aprovel': { border: '#14b8a6', accent: '#14b8a6' },
+              };
+              const clientColor = clientColors[client.name] || { border: '#6366f1', accent: '#6366f1' };
+              
+              return (
+                <Card 
+                  key={client.name}
+                  className="bg-white dark:bg-card overflow-hidden rounded-xl shadow-sm hover:shadow-md transition-all duration-200"
+                  style={{ borderTop: `3px solid ${clientColor.border}` }}
+                >
+                  <CardContent className="p-4">
+                    {/* Header */}
+                    <div className="mb-3">
+                      <h4 className="font-semibold text-foreground">{client.name}</h4>
+                      <p className="text-xs text-muted-foreground">Total: {client.total} chamados</p>
+                    </div>
+                    
+                    {/* Divider */}
+                    <div 
+                      className="h-0.5 mb-3 rounded-full"
+                      style={{ backgroundColor: clientColor.border }}
                     />
-                    <Bar dataKey="total" fill={colors.accent} radius={[0, 4, 4, 0]} barSize={20} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
+                    
+                    {/* Status Items */}
+                    <div className="space-y-2">
+                      {/* Atrasados - com destaque rosa */}
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-red-50 dark:bg-red-950/30">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-red-500" />
+                          <span className="text-sm text-foreground">Atrasados</span>
+                        </div>
+                        <span className="text-sm font-semibold text-red-600 dark:text-red-400">{client.Atrasados}</span>
+                      </div>
+                      
+                      {/* Alertas */}
+                      <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-amber-500" />
+                          <span className="text-sm text-foreground">Alertas</span>
+                        </div>
+                        <span className="text-sm font-semibold text-foreground">{client.Alertas}</span>
+                      </div>
+                      
+                      {/* No Prazo */}
+                      <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                          <span className="text-sm text-foreground">No Prazo</span>
+                        </div>
+                        <span className="text-sm font-semibold text-foreground">{client['No Prazo']}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
         </div>
 
         {/* Coluna direita com gráficos de rosca */}
