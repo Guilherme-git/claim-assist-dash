@@ -502,75 +502,76 @@ const AcompanhamentoFullscreen = () => {
       {/* Cards de Métricas por Associação */}
       {summary.by_association && Object.keys(summary.by_association).length > 0 && (
         <div className="mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {['solidy', 'nova', 'motoclub', 'aprovel']
               .filter(association => summary.by_association[association])
               .map((association) => {
               const data = summary.by_association[association];
               const total = data.delayed + data.alert + data.on_time;
               const associationConfig = {
-                solidy: { label: 'Solidy', color: 'from-green-500 to-green-600', border: 'border-green-500' },
-                nova: { label: 'Nova', color: 'from-blue-500 to-blue-600', border: 'border-blue-500' },
-                motoclub: { label: 'Motoclub', color: 'from-orange-500 to-orange-600', border: 'border-orange-500' },
-                aprovel: { label: 'Aprovel', color: 'from-teal-500 to-teal-600', border: 'border-teal-500' },
-              }[association] || { label: association, color: 'from-slate-500 to-slate-600', border: 'border-slate-500' };
+                solidy: { label: 'Solidy', borderColor: '#22c55e' },
+                nova: { label: 'Nova', borderColor: '#3b82f6' },
+                motoclub: { label: 'Motoclub', borderColor: '#f97316' },
+                aprovel: { label: 'Aprovel', borderColor: '#14b8a6' },
+              }[association] || { label: association, borderColor: '#6366f1' };
 
               return (
                 <Card
                   key={association}
-                  className={cn(
-                    "border-2 rounded-2xl shadow-md hover:shadow-lg transition-all duration-300",
-                    associationConfig.border
-                  )}
+                  className="bg-card overflow-hidden rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 border border-border/50"
+                  style={{ borderTop: `4px solid ${associationConfig.borderColor}` }}
                 >
-                  <CardContent className="p-4">
-                    {/* Header com nome da associação */}
-                    <div className={cn(
-                      "mb-3 pb-2 border-b-2",
-                      associationConfig.border
-                    )}>
-                      <h3 className={cn(
-                        "text-lg font-bold bg-gradient-to-r bg-clip-text text-transparent",
-                        associationConfig.color
-                      )}>
+                  <CardContent className="p-5">
+                    {/* Header */}
+                    <div className="mb-4">
+                      <h3 
+                        className="text-lg font-bold"
+                        style={{ color: associationConfig.borderColor }}
+                      >
                         {associationConfig.label}
                       </h3>
-                      <p className="text-xs text-muted-foreground mt-0.5">
+                      <p className="text-xs text-muted-foreground mt-1">
                         Total: {total} {total === 1 ? 'chamado' : 'chamados'}
                       </p>
                     </div>
 
-                    {/* Métricas */}
-                    <div className="space-y-2">
+                    {/* Divider */}
+                    <div 
+                      className="h-0.5 mb-4 rounded-full"
+                      style={{ backgroundColor: associationConfig.borderColor }}
+                    />
+
+                    {/* Status Items */}
+                    <div className="space-y-2.5">
                       {/* Atrasados */}
-                      <div className="flex items-center justify-between p-2 rounded-lg bg-red-50 dark:bg-red-950/20">
+                      <div className="flex items-center justify-between p-2.5 rounded-lg bg-red-50 dark:bg-red-950/30">
                         <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-red-500" />
-                          <span className="text-sm font-medium">Atrasados</span>
+                          <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                          <span className="text-sm font-medium text-foreground">Atrasados</span>
                         </div>
-                        <span className="text-lg font-bold text-red-600 dark:text-red-400">
+                        <span className="text-lg font-bold text-red-600 dark:text-red-400 tabular-nums">
                           {data.delayed}
                         </span>
                       </div>
 
                       {/* Alertas */}
-                      <div className="flex items-center justify-between p-2 rounded-lg bg-amber-50 dark:bg-amber-950/20">
+                      <div className="flex items-center justify-between p-2.5 rounded-lg hover:bg-muted/50 transition-colors">
                         <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-amber-500" />
-                          <span className="text-sm font-medium">Alertas</span>
+                          <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                          <span className="text-sm font-medium text-foreground">Alertas</span>
                         </div>
-                        <span className="text-lg font-bold text-amber-600 dark:text-amber-400">
+                        <span className="text-lg font-bold text-foreground tabular-nums">
                           {data.alert}
                         </span>
                       </div>
 
                       {/* No Prazo */}
-                      <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/20">
+                      <div className="flex items-center justify-between p-2.5 rounded-lg hover:bg-muted/50 transition-colors">
                         <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                          <span className="text-sm font-medium">No Prazo</span>
+                          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                          <span className="text-sm font-medium text-foreground">No Prazo</span>
                         </div>
-                        <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                        <span className="text-lg font-bold text-foreground tabular-nums">
                           {data.on_time}
                         </span>
                       </div>
