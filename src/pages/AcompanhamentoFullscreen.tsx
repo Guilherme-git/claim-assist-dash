@@ -839,17 +839,17 @@ const AnalyticsView = ({ summary, chamados }: AnalyticsViewProps) => {
 
         {/* Coluna direita com gráficos de rosca */}
         <div className="col-span-12 md:col-span-3 space-y-4">
-          {/* Gráfico de Rosca - Taxa de Sucesso */}
+          {/* Gráfico de Rosca - Total em Atrasos */}
           <Card className="bg-white dark:bg-card border border-slate-200 dark:border-border rounded-xl shadow-sm">
             <CardContent className="p-5">
-              <h3 className="text-base font-semibold text-foreground mb-2">Taxa de Sucesso</h3>
+              <h3 className="text-base font-semibold text-foreground mb-2">Total em Atrasos</h3>
               <div className="h-[180px] relative">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={[
-                        { name: 'No Prazo', value: displaySummary.on_time },
-                        { name: 'Outros', value: displaySummary.delayed + displaySummary.alert },
+                        { name: 'Atrasados', value: displaySummary.delayed },
+                        { name: 'Outros', value: total - displaySummary.delayed },
                       ]}
                       cx="50%"
                       cy="50%"
@@ -865,8 +865,9 @@ const AnalyticsView = ({ summary, chamados }: AnalyticsViewProps) => {
                 </ResponsiveContainer>
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="text-center">
-                    <p className="text-2xl font-bold" style={{ color: colors.accent }}>
-                      {total > 0 ? ((displaySummary.on_time / total) * 100).toFixed(0) : 0}%
+                    <p className="text-2xl font-bold" style={{ color: colors.accent }}>{displaySummary.delayed}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {total > 0 ? ((displaySummary.delayed / total) * 100).toFixed(0) : 0}%
                     </p>
                   </div>
                 </div>
@@ -874,7 +875,7 @@ const AnalyticsView = ({ summary, chamados }: AnalyticsViewProps) => {
               <div className="flex justify-center gap-4 mt-2">
                 <div className="flex items-center gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: colors.accent }} />
-                  <span className="text-xs text-muted-foreground">No Prazo</span>
+                  <span className="text-xs text-muted-foreground">Atrasados</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-full bg-slate-200" />
@@ -884,18 +885,17 @@ const AnalyticsView = ({ summary, chamados }: AnalyticsViewProps) => {
             </CardContent>
           </Card>
 
-          {/* Gráfico de Rosca - Distribuição */}
+          {/* Gráfico de Rosca - Total no Prazo */}
           <Card className="bg-white dark:bg-card border border-slate-200 dark:border-border rounded-xl shadow-sm">
             <CardContent className="p-5">
-              <h3 className="text-base font-semibold text-foreground mb-2">Distribuição</h3>
+              <h3 className="text-base font-semibold text-foreground mb-2">Total no Prazo</h3>
               <div className="h-[180px] relative">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={[
-                        { name: 'Atrasados', value: displaySummary.delayed },
-                        { name: 'Alertas', value: displaySummary.alert },
                         { name: 'No Prazo', value: displaySummary.on_time },
+                        { name: 'Outros', value: total - displaySummary.on_time },
                       ]}
                       cx="50%"
                       cy="50%"
@@ -904,38 +904,28 @@ const AnalyticsView = ({ summary, chamados }: AnalyticsViewProps) => {
                       dataKey="value"
                       stroke="none"
                     >
-                      <Cell fill={colors.accent} />
-                      <Cell fill={colors.warning} />
                       <Cell fill={colors.primary} />
+                      <Cell fill="#e2e8f0" />
                     </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#fff',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '8px',
-                      }}
-                    />
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="text-center">
-                    <p className="text-xl font-bold text-foreground">{total}</p>
-                    <p className="text-[10px] text-muted-foreground">Total</p>
+                    <p className="text-2xl font-bold" style={{ color: colors.primary }}>{displaySummary.on_time}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {total > 0 ? ((displaySummary.on_time / total) * 100).toFixed(0) : 0}%
+                    </p>
                   </div>
                 </div>
               </div>
-              <div className="flex flex-wrap justify-center gap-3 mt-2">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: colors.accent }} />
-                  <span className="text-xs text-muted-foreground">Atrasados</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: colors.warning }} />
-                  <span className="text-xs text-muted-foreground">Alertas</span>
-                </div>
+              <div className="flex justify-center gap-4 mt-2">
                 <div className="flex items-center gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: colors.primary }} />
                   <span className="text-xs text-muted-foreground">No Prazo</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-slate-200" />
+                  <span className="text-xs text-muted-foreground">Outros</span>
                 </div>
               </div>
             </CardContent>
