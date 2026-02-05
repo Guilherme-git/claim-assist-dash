@@ -32,7 +32,8 @@ import {
   Phone,
   User,
   MapPin,
-  Loader2
+  Loader2,
+  MessageCircle
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -48,6 +49,7 @@ import {
   type AssociateService,
   type Pagination
 } from "@/services/atendimentos.service";
+import { ChatModal } from "@/components/atendimentos/ChatModal";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive"; icon: any }> = {
   waiting_initial_message: { label: "Aguardando Mensagem Inicial", variant: "secondary", icon: Clock },
@@ -92,6 +94,10 @@ export default function Atendimentos() {
   const [tipoFilter, setTipoFilter] = useState<string>("todos");
   const [plataformFilter, setPlataformFilter] = useState<string>("todos");
   const [searchTerm, setSearchTerm] = useState<string>("");
+  
+  // Estado do modal de chat
+  const [chatModalOpen, setChatModalOpen] = useState(false);
+  const [selectedAtendimento, setSelectedAtendimento] = useState<AssociateService | null>(null);
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
 
   // Debounce da busca para não chamar a API a cada tecla
@@ -370,6 +376,7 @@ export default function Atendimentos() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={(e) => e.stopPropagation()}
                               >
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
@@ -377,6 +384,16 @@ export default function Atendimentos() {
                             <DropdownMenuContent align="end" className="w-48">
                               <DropdownMenuLabel>Ações</DropdownMenuLabel>
                               <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedAtendimento(atd);
+                                  setChatModalOpen(true);
+                                }}
+                              >
+                                <MessageCircle className="h-4 w-4 mr-2" />
+                                Ver Conversa
+                              </DropdownMenuItem>
                               <DropdownMenuItem>
                                 <Phone className="h-4 w-4 mr-2" />
                                 Ligar: {formatPhone(atd.phone)}
@@ -468,6 +485,13 @@ export default function Atendimentos() {
           )}
         </CardContent>
       </Card>
+
+      {/* Modal de Chat */}
+      <ChatModal
+        open={chatModalOpen}
+        onOpenChange={setChatModalOpen}
+        atendimento={selectedAtendimento}
+      />
     </DashboardLayout>
   );
 }
