@@ -3,6 +3,7 @@ import { LayoutGrid, BarChart3 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { AreaChart, Area, RadialBarChart, RadialBar } from "recharts";
 import { formatDateTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useRef } from "react";
@@ -655,7 +656,7 @@ const AcompanhamentoFullscreen = () => {
   );
 };
 
-// Componente de Visão Analítica
+// Componente de Visão Analítica com design elegante
 interface AnalyticsViewProps {
   summary: { delayed: number; alert: number; on_time: number };
   chamados: OpenCall[];
@@ -665,15 +666,15 @@ const AnalyticsView = ({ summary, chamados }: AnalyticsViewProps) => {
   const total = summary.delayed + summary.alert + summary.on_time;
   
   const pieData = [
-    { name: 'Atrasados', value: summary.delayed, color: '#ef4444' },
-    { name: 'Alertas', value: summary.alert, color: '#f59e0b' },
-    { name: 'No Prazo', value: summary.on_time, color: '#10b981' },
+    { name: 'Atrasados', value: summary.delayed, color: 'url(#gradientRed)' },
+    { name: 'Alertas', value: summary.alert, color: 'url(#gradientAmber)' },
+    { name: 'No Prazo', value: summary.on_time, color: 'url(#gradientGreen)' },
   ];
 
-  const barData = [
-    { name: 'Atrasados', quantidade: summary.delayed, fill: '#ef4444' },
-    { name: 'Alertas', quantidade: summary.alert, fill: '#f59e0b' },
-    { name: 'No Prazo', quantidade: summary.on_time, fill: '#10b981' },
+  const radialData = [
+    { name: 'No Prazo', value: total > 0 ? (summary.on_time / total) * 100 : 0, fill: 'url(#gradientGreen)' },
+    { name: 'Alertas', value: total > 0 ? (summary.alert / total) * 100 : 0, fill: 'url(#gradientAmber)' },
+    { name: 'Atrasados', value: total > 0 ? (summary.delayed / total) * 100 : 0, fill: 'url(#gradientRed)' },
   ];
 
   // Agrupar por cliente
@@ -693,131 +694,244 @@ const AnalyticsView = ({ summary, chamados }: AnalyticsViewProps) => {
     Atrasados: data.delayed,
     Alertas: data.alert,
     'No Prazo': data.on_time,
+    total: data.delayed + data.alert + data.on_time,
   }));
 
+  // Gradients SVG definitions
+  const GradientDefs = () => (
+    <defs>
+      <linearGradient id="gradientRed" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#f87171" />
+        <stop offset="100%" stopColor="#dc2626" />
+      </linearGradient>
+      <linearGradient id="gradientAmber" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#fbbf24" />
+        <stop offset="100%" stopColor="#d97706" />
+      </linearGradient>
+      <linearGradient id="gradientGreen" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#34d399" />
+        <stop offset="100%" stopColor="#059669" />
+      </linearGradient>
+      <linearGradient id="gradientPrimary" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stopColor="hsl(160, 100%, 37%)" />
+        <stop offset="100%" stopColor="hsl(160, 100%, 22%)" />
+      </linearGradient>
+      <filter id="glow">
+        <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+        <feMerge>
+          <feMergeNode in="coloredBlur"/>
+          <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+      </filter>
+    </defs>
+  );
+
   return (
-    <div className="space-y-6">
-      {/* Cards de métricas */}
+    <div className="space-y-6 animate-fade-in">
+      {/* Cards de métricas com glassmorphism */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-card border-border/50 rounded-2xl">
-          <CardContent className="p-6">
+        {/* Total Card */}
+        <Card className="relative overflow-hidden rounded-2xl border-0 bg-gradient-to-br from-slate-900 to-slate-800 shadow-2xl hover:shadow-3xl transition-all duration-500 hover:scale-[1.02] group">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-transparent opacity-50" />
+          <div className="absolute -top-10 -right-10 w-32 h-32 bg-primary/20 rounded-full blur-3xl group-hover:bg-primary/30 transition-colors" />
+          <CardContent className="p-6 relative">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total de Chamados</p>
-                <p className="text-3xl font-bold text-foreground">{total}</p>
+                <p className="text-sm text-slate-400 font-medium">Total de Chamados</p>
+                <p className="text-4xl font-bold text-white mt-1">{total}</p>
+                <p className="text-xs text-slate-500 mt-2">Ativos no momento</p>
               </div>
-              <div className="p-3 rounded-xl bg-primary/10">
-                <BarChart3 className="h-6 w-6 text-primary" />
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-primary/30 to-primary/10 backdrop-blur-sm">
+                <BarChart3 className="h-8 w-8 text-primary" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-900/50 rounded-2xl">
-          <CardContent className="p-6">
+        {/* Atrasados Card */}
+        <Card className="relative overflow-hidden rounded-2xl border-0 bg-gradient-to-br from-red-950 to-red-900 shadow-2xl hover:shadow-red-500/20 transition-all duration-500 hover:scale-[1.02] group">
+          <div className="absolute inset-0 bg-gradient-to-br from-red-500/10 to-transparent" />
+          <div className="absolute -top-10 -right-10 w-32 h-32 bg-red-500/20 rounded-full blur-3xl group-hover:bg-red-500/30 transition-colors animate-pulse" />
+          <CardContent className="p-6 relative">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-red-600 dark:text-red-400">Atrasados</p>
-                <p className="text-3xl font-bold text-red-700 dark:text-red-300">{summary.delayed}</p>
-                <p className="text-xs text-red-500">{total > 0 ? ((summary.delayed / total) * 100).toFixed(1) : 0}%</p>
+                <p className="text-sm text-red-300 font-medium">Atrasados</p>
+                <p className="text-4xl font-bold text-white mt-1">{summary.delayed}</p>
+                <div className="flex items-center gap-2 mt-2">
+                  <div className="h-1.5 w-16 bg-red-950 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-red-400 to-red-500 rounded-full transition-all duration-1000"
+                      style={{ width: `${total > 0 ? (summary.delayed / total) * 100 : 0}%` }}
+                    />
+                  </div>
+                  <span className="text-xs text-red-400">{total > 0 ? ((summary.delayed / total) * 100).toFixed(1) : 0}%</span>
+                </div>
               </div>
-              <div className="p-3 rounded-xl bg-red-500/20">
-                <AlertCircle className="h-6 w-6 text-red-500" />
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-red-500/30 to-red-600/10 backdrop-blur-sm">
+                <AlertCircle className="h-8 w-8 text-red-400" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/50 rounded-2xl">
-          <CardContent className="p-6">
+        {/* Alertas Card */}
+        <Card className="relative overflow-hidden rounded-2xl border-0 bg-gradient-to-br from-amber-950 to-amber-900 shadow-2xl hover:shadow-amber-500/20 transition-all duration-500 hover:scale-[1.02] group">
+          <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-transparent" />
+          <div className="absolute -top-10 -right-10 w-32 h-32 bg-amber-500/20 rounded-full blur-3xl group-hover:bg-amber-500/30 transition-colors" />
+          <CardContent className="p-6 relative">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-amber-600 dark:text-amber-400">Alertas</p>
-                <p className="text-3xl font-bold text-amber-700 dark:text-amber-300">{summary.alert}</p>
-                <p className="text-xs text-amber-500">{total > 0 ? ((summary.alert / total) * 100).toFixed(1) : 0}%</p>
+                <p className="text-sm text-amber-300 font-medium">Alertas</p>
+                <p className="text-4xl font-bold text-white mt-1">{summary.alert}</p>
+                <div className="flex items-center gap-2 mt-2">
+                  <div className="h-1.5 w-16 bg-amber-950 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-all duration-1000"
+                      style={{ width: `${total > 0 ? (summary.alert / total) * 100 : 0}%` }}
+                    />
+                  </div>
+                  <span className="text-xs text-amber-400">{total > 0 ? ((summary.alert / total) * 100).toFixed(1) : 0}%</span>
+                </div>
               </div>
-              <div className="p-3 rounded-xl bg-amber-500/20">
-                <Clock className="h-6 w-6 text-amber-500" />
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-500/30 to-amber-600/10 backdrop-blur-sm">
+                <Clock className="h-8 w-8 text-amber-400" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900/50 rounded-2xl">
-          <CardContent className="p-6">
+        {/* No Prazo Card */}
+        <Card className="relative overflow-hidden rounded-2xl border-0 bg-gradient-to-br from-emerald-950 to-emerald-900 shadow-2xl hover:shadow-emerald-500/20 transition-all duration-500 hover:scale-[1.02] group">
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-transparent" />
+          <div className="absolute -top-10 -right-10 w-32 h-32 bg-emerald-500/20 rounded-full blur-3xl group-hover:bg-emerald-500/30 transition-colors" />
+          <CardContent className="p-6 relative">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-emerald-600 dark:text-emerald-400">No Prazo</p>
-                <p className="text-3xl font-bold text-emerald-700 dark:text-emerald-300">{summary.on_time}</p>
-                <p className="text-xs text-emerald-500">{total > 0 ? ((summary.on_time / total) * 100).toFixed(1) : 0}%</p>
+                <p className="text-sm text-emerald-300 font-medium">No Prazo</p>
+                <p className="text-4xl font-bold text-white mt-1">{summary.on_time}</p>
+                <div className="flex items-center gap-2 mt-2">
+                  <div className="h-1.5 w-16 bg-emerald-950 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full transition-all duration-1000"
+                      style={{ width: `${total > 0 ? (summary.on_time / total) * 100 : 0}%` }}
+                    />
+                  </div>
+                  <span className="text-xs text-emerald-400">{total > 0 ? ((summary.on_time / total) * 100).toFixed(1) : 0}%</span>
+                </div>
               </div>
-              <div className="p-3 rounded-xl bg-emerald-500/20">
-                <Timer className="h-6 w-6 text-emerald-500" />
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-500/30 to-emerald-600/10 backdrop-blur-sm">
+                <Timer className="h-8 w-8 text-emerald-400" />
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Gráficos */}
+      {/* Gráficos com efeitos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Gráfico de Pizza */}
-        <Card className="bg-card border-border/50 rounded-2xl">
-          <CardContent className="p-6">
-            <h3 className="text-lg font-semibold text-foreground mb-4">Distribuição por Status</h3>
-            <div className="h-[300px]">
+        {/* Gráfico Radial Elegante */}
+        <Card className="relative overflow-hidden rounded-2xl border-0 bg-gradient-to-br from-slate-900 to-slate-800 shadow-2xl">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent" />
+          <CardContent className="p-6 relative">
+            <h3 className="text-lg font-semibold text-white mb-2">Distribuição por Status</h3>
+            <p className="text-sm text-slate-400 mb-4">Visão geral dos chamados ativos</p>
+            <div className="h-[320px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
+                  <GradientDefs />
                   <Pie
                     data={pieData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={5}
+                    innerRadius={70}
+                    outerRadius={110}
+                    paddingAngle={4}
                     dataKey="value"
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    labelLine={false}
+                    stroke="none"
+                    animationBegin={0}
+                    animationDuration={1500}
                   >
                     {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
+                      <Cell 
+                        key={`cell-${index}`} 
+                        fill={entry.color}
+                        style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))' }}
+                      />
                     ))}
                   </Pie>
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "12px",
+                      backgroundColor: "rgba(15, 23, 42, 0.95)",
+                      border: "1px solid rgba(148, 163, 184, 0.2)",
+                      borderRadius: "16px",
+                      boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
+                      padding: "12px 16px",
                     }}
+                    itemStyle={{ color: "#fff" }}
+                    labelStyle={{ color: "#94a3b8", marginBottom: "4px" }}
                   />
-                  <Legend />
+                  <Legend 
+                    verticalAlign="bottom"
+                    formatter={(value) => <span className="text-slate-300 text-sm">{value}</span>}
+                  />
                 </PieChart>
               </ResponsiveContainer>
+            </div>
+            {/* Centro do donut */}
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-[30%] text-center">
+              <p className="text-4xl font-bold text-white">{total}</p>
+              <p className="text-xs text-slate-400">Total</p>
             </div>
           </CardContent>
         </Card>
 
-        {/* Gráfico de Barras por Status */}
-        <Card className="bg-card border-border/50 rounded-2xl">
-          <CardContent className="p-6">
-            <h3 className="text-lg font-semibold text-foreground mb-4">Quantidade por Status</h3>
-            <div className="h-[300px]">
+        {/* Gráfico de Barras com Gradientes */}
+        <Card className="relative overflow-hidden rounded-2xl border-0 bg-gradient-to-br from-slate-900 to-slate-800 shadow-2xl">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent" />
+          <CardContent className="p-6 relative">
+            <h3 className="text-lg font-semibold text-white mb-2">Quantidade por Status</h3>
+            <p className="text-sm text-slate-400 mb-4">Comparativo visual de volume</p>
+            <div className="h-[320px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={barData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                <BarChart 
+                  data={[
+                    { name: 'Atrasados', quantidade: summary.delayed },
+                    { name: 'Alertas', quantidade: summary.alert },
+                    { name: 'No Prazo', quantidade: summary.on_time },
+                  ]} 
+                  margin={{ top: 20, right: 20, left: 0, bottom: 20 }}
+                >
+                  <GradientDefs />
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.1)" vertical={false} />
+                  <XAxis 
+                    dataKey="name" 
+                    tick={{ fill: "#94a3b8", fontSize: 12 }}
+                    axisLine={{ stroke: "rgba(148, 163, 184, 0.2)" }}
+                    tickLine={false}
+                  />
+                  <YAxis 
+                    tick={{ fill: "#94a3b8", fontSize: 12 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "12px",
+                      backgroundColor: "rgba(15, 23, 42, 0.95)",
+                      border: "1px solid rgba(148, 163, 184, 0.2)",
+                      borderRadius: "16px",
+                      boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
                     }}
+                    itemStyle={{ color: "#fff" }}
+                    cursor={{ fill: 'rgba(148, 163, 184, 0.05)' }}
                   />
-                  <Bar dataKey="quantidade" radius={[8, 8, 0, 0]}>
-                    {barData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
-                    ))}
+                  <Bar 
+                    dataKey="quantidade" 
+                    radius={[12, 12, 0, 0]}
+                    animationDuration={1500}
+                  >
+                    <Cell fill="url(#gradientRed)" />
+                    <Cell fill="url(#gradientAmber)" />
+                    <Cell fill="url(#gradientGreen)" />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -826,28 +940,52 @@ const AnalyticsView = ({ summary, chamados }: AnalyticsViewProps) => {
         </Card>
       </div>
 
-      {/* Gráfico por Cliente */}
+      {/* Gráfico por Cliente - Área com Gradiente */}
       {clienteBarData.length > 0 && (
-        <Card className="bg-card border-border/50 rounded-2xl">
-          <CardContent className="p-6">
-            <h3 className="text-lg font-semibold text-foreground mb-4">Chamados por Cliente</h3>
-            <div className="h-[350px]">
+        <Card className="relative overflow-hidden rounded-2xl border-0 bg-gradient-to-br from-slate-900 to-slate-800 shadow-2xl">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent" />
+          <CardContent className="p-6 relative">
+            <h3 className="text-lg font-semibold text-white mb-2">Chamados por Cliente</h3>
+            <p className="text-sm text-slate-400 mb-4">Distribuição detalhada por associação</p>
+            <div className="h-[380px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={clienteBarData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                <BarChart 
+                  data={clienteBarData} 
+                  margin={{ top: 20, right: 20, left: 0, bottom: 20 }}
+                  barGap={4}
+                >
+                  <GradientDefs />
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.1)" vertical={false} />
+                  <XAxis 
+                    dataKey="name" 
+                    tick={{ fill: "#94a3b8", fontSize: 12 }}
+                    axisLine={{ stroke: "rgba(148, 163, 184, 0.2)" }}
+                    tickLine={false}
+                  />
+                  <YAxis 
+                    tick={{ fill: "#94a3b8", fontSize: 12 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "12px",
+                      backgroundColor: "rgba(15, 23, 42, 0.95)",
+                      border: "1px solid rgba(148, 163, 184, 0.2)",
+                      borderRadius: "16px",
+                      boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
                     }}
+                    itemStyle={{ color: "#fff" }}
+                    cursor={{ fill: 'rgba(148, 163, 184, 0.05)' }}
                   />
-                  <Legend />
-                  <Bar dataKey="Atrasados" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Alertas" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="No Prazo" fill="#10b981" radius={[4, 4, 0, 0]} />
+                  <Legend 
+                    verticalAlign="top"
+                    align="right"
+                    wrapperStyle={{ paddingBottom: "20px" }}
+                    formatter={(value) => <span className="text-slate-300 text-sm">{value}</span>}
+                  />
+                  <Bar dataKey="Atrasados" fill="url(#gradientRed)" radius={[6, 6, 0, 0]} animationDuration={1500} />
+                  <Bar dataKey="Alertas" fill="url(#gradientAmber)" radius={[6, 6, 0, 0]} animationDuration={1500} />
+                  <Bar dataKey="No Prazo" fill="url(#gradientGreen)" radius={[6, 6, 0, 0]} animationDuration={1500} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
