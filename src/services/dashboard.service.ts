@@ -71,6 +71,7 @@ export interface DashboardData {
   attendancesToday: number;
   attendancesInProgress: number;
   attendancesFinished: number;
+  attendancesDelayed: number;
   averageServiceTime: string;
   averageTowingExecutionTime: string;
   quickStats: QuickStats;

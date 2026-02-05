@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Headphones, PhoneCall, CheckCircle, Clock, Loader2, Truck, DollarSign, Receipt, CreditCard, CheckCircle2 } from "lucide-react";
+import { Headphones, PhoneCall, CheckCircle, Clock, Loader2, Truck, DollarSign, Receipt, CreditCard, CheckCircle2, AlertCircle } from "lucide-react";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { Header } from "@/components/dashboard/Header";
 import { MetricCard } from "@/components/dashboard/MetricCard";
@@ -124,12 +124,21 @@ const Index = () => {
             <div className="lg:col-span-2 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <MetricCard
+                  title="Atrasos - Chamados"
+                  value={dashboardData.attendancesDelayed?.toString() || "0"}
+                  icon={AlertCircle}
+                  variant="danger"
+                  delay={350}
+                />
+                <MetricCard
                   title="Tempo Médio de Execução de Guincho - Chamados"
                   value={dashboardData.averageTowingExecutionTime || "0min"}
                   icon={Truck}
                   variant="info"
                   delay={400}
                 />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <MetricCard
                   title="Ticket Médio - Chamados"
                   value={dashboardData.towingTicket?.averageTicket || "R$ 0,00"}
@@ -137,8 +146,6 @@ const Index = () => {
                   variant="teal"
                   delay={300}
                 />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <MetricCard
                   title="Receita Total - Chamados"
                   value={dashboardData.towingTicket?.totalRevenue || "R$ 0,00"}

@@ -81,11 +81,17 @@ Este projeto front-end é **EXCLUSIVAMENTE** para gerenciamento de **GUINCHOS**.
   - Efeito visual de seleção (escala e sombra)
   - Reset para página 1 ao mudar filtro
   - Parâmetro `?association=` enviado para API
+- ✅ **Modo Analytics - Filtros Automáticos**
+  - Parâmetros de evolução por hora (`evolution_start_date`, `evolution_end_date`)
+  - Cálculo automático: primeiro e último dia do mês vigente
+  - Inputs de data preenchidos automaticamente ao entrar no modo
+  - Sincronização com filtro de associação selecionado
+  - Gráficos filtrados por data + associação
 - ✅ Sistema de áudio com sirene policial (Web Audio API)
   - Som sintetizado usando osciladores (500Hz - 1200Hz)
-  - Reprodução de 2 segundos ao detectar NOVO chamado atrasado
+  - Reprodução de 2.5 segundos ao detectar NOVO chamado atrasado
   - Detecção baseada em comparação de contadores (atual > anterior)
-  - Para automaticamente após 2 segundos
+  - Para automaticamente após 2.5 segundos
   - Controle de mute/unmute
 - ✅ Integração com API `/api/calls/guinchos/open`
   - Polling a cada 10 segundos
@@ -1003,13 +1009,19 @@ export const callsService = {
    *
    * @param page - Número da página (padrão: 1)
    * @param limit - Quantidade de registros por página (padrão: 50)
-   * @param association - Filtro opcional por associação (solidy, nova, motoclub, aprovel, agsmb)
+   * @param association - Filtro opcional por associação (solidy, nova, motoclub, aprovel)
    */
-  getOpenCalls: async (page: number = 1, limit: number = 50, association?: string): Promise<OpenCallsResponse> => {
+  getOpenCalls: async (
+    page: number = 1,
+    limit: number = 50,
+    association?: string
+  ): Promise<OpenCallsResponse> => {
     const params: Record<string, string | number> = { page, limit };
+
     if (association && association !== 'todos') {
       params.association = association;
     }
+
     const { data } = await api.get<OpenCallsResponse>('/api/calls/guinchos/open', {
       params,
     });
@@ -3695,10 +3707,10 @@ A página reproduz automaticamente um som de sirene de polícia **quando detecta
 
 #### **Funcionalidades do Áudio**
 
-- **Reprodução por detecção:** Som toca **APENAS 2 segundos** quando detecta novo chamado atrasado
+- **Reprodução por detecção:** Som toca **APENAS 2.5 segundos** quando detecta novo chamado atrasado
 - **Detecção de novos chamados:** Compara `summary.delayed` atual com anterior
   - Se contador aumentou → novo chamado atrasado detectado → toca sirene
-  - Som para automaticamente após 2 segundos
+  - Som para automaticamente após 2.5 segundos
 - **Repetição no polling:** A cada 10 segundos, se houver novo atrasado, toca novamente
 - **Web Audio API:** Som sintetizado usando osciladores (sem arquivos externos)
 - **Padrão sonoro:** Sirene em padrão "Wail" (500Hz a 1200Hz)
@@ -3792,12 +3804,12 @@ useEffect(() => {
       // Tocar o som
       audio.play();
 
-      // Parar após 2 segundos
+      // Parar após 2.5 segundos
       setTimeout(() => {
         if (audio.isPlaying()) {
           audio.pause();
         }
-      }, 2000);
+      }, 2500);
     } catch (error) {
       console.log("Não foi possível iniciar o som automaticamente.");
     }
@@ -3985,15 +3997,141 @@ Botão "Solidy" fica em destaque:
   - Texto branco
 ```
 
+#### **Modo Analytics - Filtros Automáticos**
+
+Ao entrar no modo Analytics (botão "Análise"), filtros adicionais são aplicados automaticamente para os gráficos de evolução.
+
+**Parâmetros Adicionais no Modo Analytics:**
+
+| Parâmetro | Valor | Descrição |
+|-----------|-------|-----------|
+| `evolution_start_date` | `2026-02-01` | Primeiro dia do mês vigente (formato YYYY-MM-DD) |
+| `evolution_end_date` | `2026-02-28` | Último dia do mês vigente (formato YYYY-MM-DD) |
+| `association` | Selecionado | Mantém associação selecionada nos chips (se houver) |
+
+**Cálculo Automático das Datas:**
+
+```typescript
+// Imports necessários
+import { format, startOfMonth, endOfMonth } from "date-fns";
+
+// No useEffect de fetchChamados:
+const hoje = new Date();
+const primeiroDiaDoMes = startOfMonth(hoje);  // 2026-02-01 00:00:00
+const ultimoDiaDoMes = endOfMonth(hoje);      // 2026-02-28 23:59:59
+
+// Formatar no padrão YYYY-MM-DD
+const evolutionStartDate = format(primeiroDiaDoMes, 'yyyy-MM-dd');
+const evolutionEndDate = format(ultimoDiaDoMes, 'yyyy-MM-dd');
+
+// Passar para API apenas quando em modo analítico
+const response = await callsService.getOpenCalls(
+  currentPage,
+  perPage,
+  selectedAssociation,
+  viewMode === 'analytics' ? evolutionStartDate : undefined,
+  viewMode === 'analytics' ? evolutionEndDate : undefined
+);
+```
+
+**Inicialização dos Inputs de Data:**
+
+Os inputs de data início e fim são preenchidos automaticamente ao entrar no modo Analytics:
+
+```typescript
+const AnalyticsView = ({ summary, chamados }: AnalyticsViewProps) => {
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
+
+  // Inicializar com primeiro e último dia do mês vigente
+  useEffect(() => {
+    const hoje = new Date();
+    setStartDate(startOfMonth(hoje));  // Exibe "01/02/2026" no input
+    setEndDate(endOfMonth(hoje));      // Exibe "28/02/2026" no input
+  }, []);
+}
+```
+
+**Exemplos de Requisições:**
+
+**Modo Cards (sem filtro):**
+```
+GET /api/calls/guinchos/open?page=1&limit=20
+```
+
+**Modo Cards (com Motoclub):**
+```
+GET /api/calls/guinchos/open?page=1&limit=20&association=motoclub
+```
+
+**Modo Analytics (sem filtro):**
+```
+GET /api/calls/guinchos/open/analitico?start_by_hour=2026-02-01&end_by_hour=2026-02-28
+```
+
+**Modo Analytics (com filtro de data personalizado):**
+```
+GET /api/calls/guinchos/open/analitico?start_by_hour=2026-02-01&end_by_hour=2026-02-05
+```
+
+**Importante:**
+- ✅ Modo Cards usa endpoint `/api/calls/guinchos/open` (retorna `data`, `summary`, `pagination`)
+- ✅ Modo Analytics usa endpoint `/api/calls/guinchos/open/analitico` (retorna dados agregados diretamente)
+- ❌ Filtro de associação NÃO está disponível no endpoint `/analitico`
+
+**Separação de Responsabilidades:**
+
+| Endpoint | Uso | Retorna |
+|----------|-----|---------|
+| `/api/calls/guinchos/open` | Modo Cards | Lista paginada + contadores básicos |
+| `/api/calls/guinchos/open/analitico` | Modo Analytics | Dados agregados + gráficos |
+
+**Serviço Atualizado:**
+
+```typescript
+// src/services/calls.service.ts
+getOpenCalls: async (
+  page: number = 1,
+  limit: number = 50,
+  association?: string,
+  evolutionStartDate?: string,
+  evolutionEndDate?: string
+): Promise<OpenCallsResponse> => {
+  const params: Record<string, string | number> = { page, limit };
+
+  if (association && association !== 'todos') {
+    params.association = association;
+  }
+  if (evolutionStartDate) {
+    params.evolution_start_date = evolutionStartDate;
+  }
+  if (evolutionEndDate) {
+    params.evolution_end_date = evolutionEndDate;
+  }
+
+  const { data } = await api.get<OpenCallsResponse>('/api/calls/guinchos/open', {
+    params,
+  });
+  return data;
+}
+```
+
+**Comportamento dos Gráficos:**
+
+- **Evolução por Hora:** Usa `evolution_by_hour` da API filtrada por data e associação
+- **Por Associação:** Usa `by_association` da API filtrada por data
+- **Cards de Métricas:** Usa totais (`delayed`, `alert`, `on_time`) filtrados
+- **Gráficos de Rosca:** Calculam % baseado nos totais filtrados
+
 #### **Atualização Automática**
 
 - Busca inicial ao carregar a página
 - Atualização automática a cada **10 segundos** (polling)
 - Mantém a página atual e filtro selecionado durante atualizações
 - Estados de loading e error com feedback visual
-- Som da sirene toca **por 2 segundos** ao detectar novo chamado atrasado
+- Som da sirene toca **por 2.5 segundos** ao detectar novo chamado atrasado
   - Compara `summary.delayed` atual com anterior
-  - Se aumentou: toca sirene por 2 segundos e para automaticamente
+  - Se aumentou: toca sirene por 2.5 segundos e para automaticamente
   - A cada polling, repete o processo de detecção
 
 #### **Paginação**
@@ -4484,6 +4622,7 @@ A página pode ser acessada de duas formas:
    - Total de alertas (amarelo)
    - Total no prazo (verde)
    - Usa `summary` da API (não conta página atual)
+   - Tooltips explicativos ao passar o mouse sobre cada contador
 
 5. **Métricas de Desempenho**
    - Distância do guincho (km)
@@ -4496,6 +4635,12 @@ A página pode ser acessada de duas formas:
    - Relógio em tempo real
    - Modo fullscreen
    - Grid responsivo (1-5 colunas)
+
+7. **Ícone de Ajuda nos Cards**
+   - Ícone "?" (HelpCircle) no canto superior esquerdo de cada card
+   - Tooltip explicativo ao passar o mouse
+   - Informações sobre todos os campos do card
+   - Aparece ao lado direito para não sobrepor o conteúdo
 
 #### **🔄 Fluxo de Dados**
 
@@ -4516,6 +4661,115 @@ OpenCallsResponse
 - ✅ **Contadores corretos:** Usa `summary` da API, não conta items da página
 - ✅ **Campos sempre visíveis:** `expected_arrival_date` e `expected_completion_date` mostram "Não definida" quando null
 
+#### **❓ Ícone de Ajuda com Tooltip**
+
+Cada card possui um ícone de ajuda (?) que exibe um tooltip explicativo ao passar o mouse.
+
+**Localização:**
+- Canto superior esquerdo do card
+- Ao lado do badge de status
+
+**Componente:**
+```tsx
+<TooltipProvider>
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <button className="p-1 hover:bg-muted rounded-full transition-colors">
+        <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
+      </button>
+    </TooltipTrigger>
+    <TooltipContent side="right" className="max-w-xs p-4">
+      {/* Conteúdo explicativo */}
+    </TooltipContent>
+  </Tooltip>
+</TooltipProvider>
+```
+
+**Conteúdo do Tooltip:**
+
+| Campo | Descrição |
+|-------|-----------|
+| **Usuário** | Nome do associado/cliente que solicitou o atendimento |
+| **Cliente** | Associação ou empresa responsável (Solidy, Nova, Motoclub, etc.) |
+| **Atendente** | Responsável que está atendendo o chamado |
+| **Veículo** | Informações do veículo (marca, modelo e placa) |
+| **Início** | Data/hora que o chamado foi criado |
+| **Prev. Chegada** | Previsão de chegada do guincho ao local |
+| **Prev. Conclusão** | Previsão de conclusão total do atendimento |
+| **Distância** | Distância em km até o local do chamado |
+| **Chegada** | Tempo estimado de chegada em minutos |
+| **Serviço** | Duração estimada para conclusão do serviço |
+
+**Características:**
+- ✅ Aparece ao lado direito (`side="right"`) para não cobrir o card
+- ✅ Largura máxima controlada (`max-w-xs`)
+- ✅ Seções separadas por bordas para melhor legibilidade
+- ✅ Labels em negrito para destaque
+- ✅ Hover suave no ícone (muted → foreground)
+
+**Imports Necessários:**
+```tsx
+import { HelpCircle } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+```
+
+**Nota:** O Tooltip do shadcn/ui foi renomeado para não conflitar com o Tooltip do Recharts usado nos gráficos:
+```tsx
+import { Tooltip as RechartsTooltip } from "recharts";
+```
+
+#### **📊 Tooltips dos Contadores de Status**
+
+Os contadores globais no header (Atrasados, Alertas, No Prazo) possuem tooltips explicativos.
+
+**Localização:**
+- Header da página, ao lado do relógio
+- Antes dos botões de toggle Cards/Análise
+
+**Implementação:**
+```tsx
+{/* Atrasados */}
+<TooltipProvider>
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <div className="flex items-center gap-2 cursor-help">
+        <div className="w-3 h-3 rounded-full bg-red-500" />
+        <span className="text-sm font-medium">{delayedCount} Atrasados</span>
+      </div>
+    </TooltipTrigger>
+    <TooltipContent className="max-w-xs">
+      <p className="font-semibold mb-1">Atrasados</p>
+      <p className="text-xs">
+        Chamados que ultrapassaram o tempo previsto de conclusão.
+        Requerem atenção imediata.
+      </p>
+    </TooltipContent>
+  </Tooltip>
+</TooltipProvider>
+```
+
+**Descrições dos Status:**
+
+| Status | Cor | Descrição | Critério |
+|--------|-----|-----------|----------|
+| **Atrasados** 🔴 | Vermelho (`bg-red-500`) | Chamados que ultrapassaram o tempo previsto de conclusão. Requerem atenção imediata. | Passou do horário previsto |
+| **Alertas** ⚠️ | Amarelo (`bg-amber-500`) | Chamados próximos ao prazo limite. Devem ser monitorados com atenção. | Faltam entre 1 e 10 minutos para o prazo |
+| **No Prazo** ✅ | Verde (`bg-emerald-500`) | Chamados dentro do tempo esperado de conclusão. Operação normal. | Faltam mais de 10 minutos para o prazo |
+
+**Exemplos de Cenários:**
+- Faltam 15 minutos → **No Prazo** ✅
+- Faltam 10 minutos → **Alerta** ⚠️
+- Faltam 5 minutos → **Alerta** ⚠️
+- Faltam 1 minuto → **Alerta** ⚠️
+- Passou 1 minuto → **Atrasado** 🔴
+
+**Características:**
+- ✅ Cursor muda para `help` (?) ao passar sobre o contador
+- ✅ Tooltip aparece automaticamente ao hover
+- ✅ Largura máxima controlada (`max-w-xs`)
+- ✅ Título em negrito + descrição em texto pequeno
+- ✅ Mesma experiência visual dos outros tooltips
+
 #### **📦 Arquivos Relacionados**
 
 | Arquivo | Responsabilidade |
@@ -4524,6 +4778,615 @@ OpenCallsResponse
 | `src/services/calls.service.ts` | Serviço com `getOpenCalls()` e interfaces |
 | `src/App.tsx` | Rota `/acompanhamento-fullscreen` (pública) |
 | `src/components/dashboard/DateRangeFilter.tsx` | Botão "Acompanhamento" para abrir em nova aba |
+
+---
+
+## **📊 Modo Analítico - Dashboard de Análise**
+
+### **Visão Geral**
+
+O Acompanhamento Fullscreen possui dois modos de visualização:
+1. **Cards**: Exibição tradicional em cards com polling de 10 segundos
+2. **Análise**: Dashboard analítico com gráficos e métricas agregadas
+
+### **Alternância de Modos**
+
+Botões de toggle localizados no header (ao lado do botão de som):
+- **Cards** (ícone `LayoutGrid`): Visualização em cards
+- **Análise** (ícone `BarChart3`): Visualização analítica
+
+### **Endpoint Analítico**
+
+#### **📡 GET /api/calls/guinchos/open/analitico**
+
+**Parâmetros:**
+| Parâmetro | Tipo | Obrigatório | Descrição |
+|-----------|------|-------------|-----------|
+| `start_by_hour` | string | Não | Data inicial no formato YYYY-MM-DD |
+| `end_by_hour` | string | Não | Data final no formato YYYY-MM-DD |
+
+**Estrutura da Resposta:**
+```typescript
+interface AnalyticsResponse {
+  total: number;
+  delayed: number;
+  alert: number;
+  on_time: number;
+  evolution_by_hour: Array<{
+    hour: string;        // Formato "HH:00"
+    on_time: number;
+    alert: number;
+    delayed: number;
+  }>;
+  by_association: {
+    [key: string]: {     // "solidy", "nova", "motoclub", "aprovel"
+      on_time: number;
+      alert: number;
+      delayed: number;
+    };
+  };
+}
+```
+
+**Exemplo de Resposta:**
+```json
+{
+  "total": 29773,
+  "delayed": 2,
+  "alert": 0,
+  "on_time": 29771,
+  "evolution_by_hour": [
+    {
+      "hour": "00:00",
+      "on_time": 5,
+      "alert": 0,
+      "delayed": 0
+    },
+    {
+      "hour": "01:00",
+      "on_time": 3,
+      "alert": 0,
+      "delayed": 0
+    }
+  ],
+  "by_association": {
+    "solidy": {
+      "on_time": 488,
+      "alert": 0,
+      "delayed": 1
+    },
+    "motoclub": {
+      "on_time": 142,
+      "alert": 0,
+      "delayed": 0
+    },
+    "nova": {
+      "on_time": 53,
+      "alert": 0,
+      "delayed": 0
+    },
+    "aprovel": {
+      "on_time": 0,
+      "alert": 0,
+      "delayed": 0
+    }
+  }
+}
+```
+
+**Diferenças do endpoint `/open`:**
+- Retorna dados agregados **diretamente no root** (sem wrapper `summary`)
+- Inclui campo `total` com contagem total de chamados
+- Não retorna array `data` nem `pagination`
+- Focado exclusivamente em dados analíticos
+- Possui campos `evolution_by_hour` e `by_association` que **NÃO** existem no endpoint `/open`
+
+**Estrutura do endpoint `/open` (simplificada):**
+```json
+{
+  "data": [...],
+  "summary": {
+    "delayed": 2,
+    "alert": 0,
+    "on_time": 29771
+  },
+  "pagination": {...}
+}
+```
+
+**Nota:** O endpoint `/open` não retorna mais `evolution_by_hour` e `by_association`. Esses dados estão disponíveis exclusivamente no endpoint `/analitico`.
+
+### **Implementação do Service**
+
+```typescript
+// src/services/calls.service.ts
+
+export const callsService = {
+  /**
+   * GET /api/calls/guinchos/open/analitico
+   * Busca dados analíticos dos chamados em aberto
+   */
+  getAnalytics: async (
+    startByHour?: string,
+    endByHour?: string
+  ): Promise<AnalyticsResponse> => {
+    const params: Record<string, string> = {};
+    if (startByHour) params.start_by_hour = startByHour;
+    if (endByHour) params.end_by_hour = endByHour;
+
+    const { data } = await api.get<AnalyticsResponse>(
+      '/api/calls/guinchos/open/analitico',
+      { params }
+    );
+    return data;
+  },
+};
+```
+
+### **Componente AnalyticsView**
+
+**Características:**
+- Estado próprio independente do modo Cards
+- Carrega dados ao ser montado
+- Filtro de data automático (primeiro e último dia do mês)
+- **SEM polling automático** (apenas no modo Cards)
+
+**Estrutura do Layout:**
+```
+┌─────────────────────────────────────────────────────────┐
+│  Métricas  │    Gráficos Centrais    │  Gráficos Rosca │
+│   (2 cols) │        (7 cols)         │     (3 cols)    │
+├────────────┼─────────────────────────┼──────────────────┤
+│  • Total   │  Evolução por Hora      │  Total Atrasos  │
+│  • Atras.  │  (Gráfico de Área)      │  (Donut Chart)  │
+│  • Alertas │                         │                 │
+│  • No Prazo│  ─────────────────────  │  Total No Prazo │
+│            │  Por Cliente            │  (Donut Chart)  │
+│            │  (Barra Horizontal)     │                 │
+└────────────┴─────────────────────────┴──────────────────┘
+```
+
+### **Gráficos e Visualizações**
+
+#### **1. Cards de Métricas (Esquerda)**
+- **Total de Chamados**: Soma geral
+- **Atrasados**: Cor magenta (#ec4899)
+- **Alertas**: Cor amarela (#f59e0b)
+- **No Prazo**: Cor verde (#10b981)
+
+#### **2. Evolução por Hora (Centro)**
+- Tipo: Gráfico de Área (AreaChart)
+- Dados: `evolution_by_hour`
+- Séries:
+  - "No Prazo" (azul, com gradiente)
+  - "Alertas" (amarelo)
+  - "Atrasados" (magenta)
+- Filtros de data:
+  - Data Início (Calendar Picker)
+  - Data Fim (Calendar Picker)
+  - Botão "Limpar"
+  - **Inicialização:** Primeiro e último dia do mês atual
+
+#### **3. Por Cliente (Centro)**
+- Tipo: Barra Horizontal (BarChart)
+- Dados: `by_association`
+- Mostra total por cliente (Solidy, Nova, Motoclub, Aprovel)
+
+#### **4. Gráficos de Rosca (Direita)**
+- **Total em Atrasos**: % de atrasados vs outros
+- **Total no Prazo**: % no prazo vs outros
+- Formato: Donut Chart (PieChart com innerRadius)
+
+### **Sistema de Polling**
+
+#### **Modo Cards**
+```typescript
+useEffect(() => {
+  if (viewMode === 'analytics') {
+    setLoading(false);
+    return; // Sai sem criar interval
+  }
+
+  const fetchChamados = async () => {
+    const response = await callsService.getOpenCalls(...);
+    // Atualiza dados
+  };
+
+  fetchChamados();
+  const interval = setInterval(fetchChamados, 10000); // ✅ Polling a cada 10s
+
+  return () => clearInterval(interval); // ✅ Limpa ao mudar de modo
+}, [currentPage, selectedAssociation, viewMode]);
+```
+
+**Comportamento:**
+- ✅ **Modo Cards**: Polling ativo a cada 10 segundos
+- ❌ **Modo Analítico**: SEM polling automático
+- ✅ **Volta para Cards**: Polling reinicia automaticamente
+
+#### **Modo Analítico**
+```typescript
+useEffect(() => {
+  const fetchAnalytics = async () => {
+    const startByHour = startDate ? format(startDate, 'yyyy-MM-dd') : undefined;
+    const endByHour = endDate ? format(endDate, 'yyyy-MM-dd') : undefined;
+
+    const response = await callsService.getAnalytics(startByHour, endByHour);
+    setAnalyticsData({
+      delayed: response.delayed || 0,
+      alert: response.alert || 0,
+      on_time: response.on_time || 0,
+      evolution_by_hour: response.evolution_by_hour || [],
+      by_association: response.by_association || {},
+    });
+  };
+
+  if (startDate && endDate) {
+    fetchAnalytics(); // ✅ Busca apenas quando datas mudam
+  }
+}, [startDate, endDate]);
+```
+
+**Comportamento:**
+- Carrega dados ao montar o componente
+- Recarrega quando usuário altera datas no filtro
+- **SEM atualização automática** (sem `setInterval`)
+
+### **Fluxo de Dados - Modo Analítico**
+
+```
+Usuário clica em "Análise"
+    ↓
+AnalyticsView monta
+    ↓
+Inicializa datas (1º e último dia do mês)
+    ↓
+GET /api/calls/guinchos/open/analitico?start_by_hour=2026-02-01&end_by_hour=2026-02-28
+    ↓
+AnalyticsResponse (dados diretos, sem "summary" wrapper)
+    ↓
+Renderiza gráficos e métricas
+    ↓
+Usuário altera datas → Nova requisição com novos parâmetros
+```
+
+### **Tratamento de Erros**
+
+```typescript
+try {
+  const response = await callsService.getAnalytics(startByHour, endByHour);
+  setAnalyticsData({
+    delayed: response.delayed || 0,
+    alert: response.alert || 0,
+    on_time: response.on_time || 0,
+    evolution_by_hour: response.evolution_by_hour || [],
+    by_association: response.by_association || {},
+  });
+} catch (err) {
+  console.error('Erro ao buscar dados analíticos:', err);
+  setError('Não foi possível carregar os dados analíticos. A página será atualizada automaticamente.');
+  // Mantém dados zerados em caso de erro
+  setAnalyticsData({
+    delayed: 0,
+    alert: 0,
+    on_time: 0,
+    evolution_by_hour: [],
+    by_association: {},
+  });
+}
+```
+
+**Estados de UI:**
+1. **Loading**: Spinner + mensagem "Carregando dados analíticos..."
+2. **Error**: Ícone de alerta + mensagem de erro
+3. **Success**: Renderiza gráficos normalmente
+
+### **Configurações de Timeout**
+
+```typescript
+// src/lib/api.ts
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001',
+  timeout: 30000, // 30 segundos para processamento analítico
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+```
+
+**Motivo:** Dados analíticos podem demorar mais para processar (média 7s no Postman)
+
+### **Cores do Tema Analítico**
+
+```typescript
+const colors = {
+  primary: '#2563eb',   // Azul (No Prazo)
+  accent: '#ec4899',    // Magenta/Rosa (Atrasados)
+  success: '#10b981',   // Verde (Sucesso)
+  warning: '#f59e0b',   // Amarelo (Alertas)
+  danger: '#ef4444',    // Vermelho (Perigo)
+  gray: '#94a3b8',      // Cinza (Outros)
+};
+```
+
+### **Bibliotecas Utilizadas**
+
+- **Recharts**: Gráficos (PieChart, BarChart, AreaChart)
+- **date-fns**: Manipulação de datas (startOfMonth, endOfMonth, format)
+- **shadcn/ui**: Componentes (Calendar, Popover, Card)
+- **Lucide Icons**: Ícones (LayoutGrid, BarChart3, CalendarIcon)
+
+### **Exemplo de Uso - Filtro por Data**
+
+```typescript
+// Inicialização automática
+useEffect(() => {
+  const hoje = new Date();
+  setStartDate(startOfMonth(hoje));  // 2026-02-01
+  setEndDate(endOfMonth(hoje));      // 2026-02-28
+}, []);
+
+// Quando usuário seleciona nova data
+<CalendarPicker
+  mode="single"
+  selected={startDate}
+  onSelect={setStartDate}  // ← Triggers nova requisição
+  locale={ptBR}
+/>
+```
+
+### **Comparação: Cards vs Analítico**
+
+| Característica | Modo Cards | Modo Analítico |
+|----------------|-----------|----------------|
+| **Endpoint** | `/api/calls/guinchos/open` | `/api/calls/guinchos/open/analitico` |
+| **Polling** | ✅ 10 segundos | ❌ Desabilitado |
+| **Dados Retornados** | `data[]`, `summary`, `pagination` | `total`, `delayed`, `alert`, `on_time`, `evolution_by_hour[]`, `by_association{}` |
+| **Summary** | Apenas contadores básicos (`delayed`, `alert`, `on_time`) | Dados completos para gráficos |
+| **Visualização** | Grid de cards | Gráficos e métricas |
+| **Filtros** | Associação + Paginação | Datas (start_by_hour, end_by_hour) |
+| **Performance** | Leve (10-20 registros) | Pesado (~7s de processamento) |
+| **Atualização** | Automática (10s) | Manual (usuário altera datas) |
+| **Campos Especiais** | - | `evolution_by_hour`, `by_association` |
+
+### **Arquivos Modificados**
+
+| Arquivo | Mudanças |
+|---------|----------|
+| `src/services/calls.service.ts` | Adicionado `getAnalytics()` e interface `AnalyticsResponse` |
+| `src/pages/AcompanhamentoFullscreen.tsx` | Componente `AnalyticsView` e toggle de modos |
+| `src/lib/api.ts` | Timeout aumentado para 30s |
+
+---
+
+## **📊 Cards de Métricas por Associação - Modo Cards**
+
+### **Visão Geral**
+
+No modo Cards, abaixo do filtro de clientes, são exibidos cards individuais para cada associação mostrando suas métricas em tempo real (atrasados, alertas e no prazo).
+
+### **Dados da API**
+
+O endpoint `/api/calls/guinchos/open` retorna `by_association` dentro do `summary`:
+
+```typescript
+interface OpenCallsResponse {
+  data: OpenCall[];
+  pagination: Pagination;
+  summary: {
+    delayed: number;
+    alert: number;
+    on_time: number;
+    by_association: {
+      [key: string]: {     // "solidy", "nova", "motoclub", "aprovel"
+        on_time: number;
+        alert: number;
+        delayed: number;
+      };
+    };
+  };
+}
+```
+
+**Exemplo de Resposta:**
+```json
+{
+  "summary": {
+    "delayed": 2,
+    "alert": 0,
+    "on_time": 29771,
+    "by_association": {
+      "solidy": {
+        "on_time": 488,
+        "alert": 0,
+        "delayed": 1
+      },
+      "motoclub": {
+        "on_time": 142,
+        "alert": 0,
+        "delayed": 0
+      },
+      "nova": {
+        "on_time": 53,
+        "alert": 0,
+        "delayed": 0
+      },
+      "aprovel": {
+        "on_time": 0,
+        "alert": 0,
+        "delayed": 0
+      }
+    }
+  }
+}
+```
+
+### **Layout dos Cards**
+
+**Posicionamento:**
+- Localizado entre o filtro de clientes e o grid de chamados
+- Grid responsivo: 1 coluna (mobile) → 2 (tablet) → 4 (desktop)
+
+**Ordem Fixa (alinhada com filtros):**
+1. Solidy (verde)
+2. Nova (azul)
+3. Motoclub (laranja)
+4. Aprovel (teal)
+
+### **Estrutura de Cada Card**
+
+```
+┌─────────────────────────────┐
+│ ┌─ SOLIDY ─────────────────┐│ ← Header com gradiente
+│ │ Total: 489 chamados      ││ ← Contador total
+│ └──────────────────────────┘│
+├─────────────────────────────┤
+│ 🔴 Atrasados           1    │ ← Fundo vermelho claro
+├─────────────────────────────┤
+│ 🟡 Alertas             0    │ ← Fundo amarelo claro
+├─────────────────────────────┤
+│ 🟢 No Prazo          488    │ ← Fundo verde claro
+└─────────────────────────────┘
+```
+
+### **Configuração por Associação**
+
+| Associação | Label | Gradiente | Borda |
+|------------|-------|-----------|-------|
+| `solidy` | Solidy | `from-green-500 to-green-600` | `border-green-500` |
+| `nova` | Nova | `from-blue-500 to-blue-600` | `border-blue-500` |
+| `motoclub` | Motoclub | `from-orange-500 to-orange-600` | `border-orange-500` |
+| `aprovel` | Aprovel | `from-teal-500 to-teal-600` | `border-teal-500` |
+
+### **Cores das Métricas**
+
+| Métrica | Cor | Fundo | Número |
+|---------|-----|-------|--------|
+| **Atrasados** | Vermelho | `bg-red-50 dark:bg-red-950/20` | `text-red-600 dark:text-red-400` |
+| **Alertas** | Amarelo | `bg-amber-50 dark:bg-amber-950/20` | `text-amber-600 dark:text-amber-400` |
+| **No Prazo** | Verde | `bg-emerald-50 dark:bg-emerald-950/20` | `text-emerald-600 dark:text-emerald-400` |
+
+### **Implementação**
+
+```typescript
+// src/pages/AcompanhamentoFullscreen.tsx
+
+{/* Cards de Métricas por Associação */}
+{summary.by_association && Object.keys(summary.by_association).length > 0 && (
+  <div className="mb-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {['solidy', 'nova', 'motoclub', 'aprovel']
+        .filter(association => summary.by_association[association])
+        .map((association) => {
+        const data = summary.by_association[association];
+        const total = data.delayed + data.alert + data.on_time;
+        const associationConfig = {
+          solidy: { label: 'Solidy', color: 'from-green-500 to-green-600', border: 'border-green-500' },
+          nova: { label: 'Nova', color: 'from-blue-500 to-blue-600', border: 'border-blue-500' },
+          motoclub: { label: 'Motoclub', color: 'from-orange-500 to-orange-600', border: 'border-orange-500' },
+          aprovel: { label: 'Aprovel', color: 'from-teal-500 to-teal-600', border: 'border-teal-500' },
+        }[association];
+
+        return (
+          <Card key={association} className={cn("border-2", associationConfig.border)}>
+            <CardContent className="p-4">
+              {/* Header */}
+              <div className={cn("mb-3 pb-2 border-b-2", associationConfig.border)}>
+                <h3 className={cn("text-lg font-bold bg-gradient-to-r bg-clip-text text-transparent", associationConfig.color)}>
+                  {associationConfig.label}
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Total: {total} {total === 1 ? 'chamado' : 'chamados'}
+                </p>
+              </div>
+
+              {/* Métricas */}
+              <div className="space-y-2">
+                {/* Atrasados */}
+                <div className="flex items-center justify-between p-2 rounded-lg bg-red-50">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-red-500" />
+                    <span className="text-sm font-medium">Atrasados</span>
+                  </div>
+                  <span className="text-lg font-bold text-red-600">{data.delayed}</span>
+                </div>
+
+                {/* Alertas */}
+                <div className="flex items-center justify-between p-2 rounded-lg bg-amber-50">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-amber-500" />
+                    <span className="text-sm font-medium">Alertas</span>
+                  </div>
+                  <span className="text-lg font-bold text-amber-600">{data.alert}</span>
+                </div>
+
+                {/* No Prazo */}
+                <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-50">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <span className="text-sm font-medium">No Prazo</span>
+                  </div>
+                  <span className="text-lg font-bold text-emerald-600">{data.on_time}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  </div>
+)}
+```
+
+### **Características**
+
+**✅ Ordem Fixa:**
+- Cards sempre aparecem na ordem: Solidy → Nova → Motoclub → Aprovel
+- Independente da ordem retornada pela API
+- Filtro garante que só exibe associações existentes
+
+**✅ Responsividade:**
+- Mobile (< 768px): 1 coluna
+- Tablet (768px - 1024px): 2 colunas
+- Desktop (> 1024px): 4 colunas
+
+**✅ Visual:**
+- Borda colorida de 2px
+- Header com gradiente no texto
+- Indicadores circulares coloridos
+- Fundos suaves para cada métrica
+- Hover com sombra aumentada
+
+**✅ Atualização:**
+- Dados atualizados a cada 10 segundos (polling do modo Cards)
+- Sincronizado com o endpoint `/api/calls/guinchos/open`
+
+### **Fluxo de Dados**
+
+```
+API Response (a cada 10s)
+    ↓
+summary.by_association
+    ↓
+Array ordenado: ['solidy', 'nova', 'motoclub', 'aprovel']
+    ↓
+Filter (só associações existentes)
+    ↓
+Map → Renderiza cards na ordem fixa
+```
+
+### **Diferenças: Endpoint `/open` vs `/analitico`**
+
+| Campo | `/open` | `/analitico` |
+|-------|---------|--------------|
+| `by_association` | ✅ Sim (dentro de `summary`) | ✅ Sim (root) |
+| `evolution_by_hour` | ❌ Não | ✅ Sim |
+| `data[]` | ✅ Sim | ❌ Não |
+| `pagination` | ✅ Sim | ❌ Não |
+
+**Importante:** Agora ambos os endpoints retornam `by_association`, mas com propósitos diferentes:
+- `/open`: Para cards de métricas no modo Cards
+- `/analitico`: Para gráficos no modo Analítico
 
 ---
 

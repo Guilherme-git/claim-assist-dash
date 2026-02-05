@@ -1,14 +1,15 @@
-import { User, Car, Calendar, Clock, Maximize2, Minimize2, Volume2, VolumeX, Loader2, AlertCircle, ChevronLeft, ChevronRight, MapPin as RouteIcon, Timer, Wrench, Building2 } from "lucide-react";
+import { User, Car, Calendar, Clock, Maximize2, Minimize2, Volume2, VolumeX, Loader2, AlertCircle, ChevronLeft, ChevronRight, MapPin as RouteIcon, Timer, Wrench, Building2, HelpCircle } from "lucide-react";
 import { LayoutGrid, BarChart3, Calendar as CalendarIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from "recharts";
 import { AreaChart, Area, RadialBarChart, RadialBar } from "recharts";
 import { formatDateTime, cn } from "@/lib/utils";
 import { useState, useEffect, useRef } from "react";
-import { format } from "date-fns";
+import { format, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { callsService, type OpenCall, type Pagination } from "@/services/calls.service";
 
@@ -48,7 +49,12 @@ const AcompanhamentoFullscreen = () => {
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState<Pagination | null>(null);
-  const [summary, setSummary] = useState({ delayed: 0, alert: 0, on_time: 0 });
+  const [summary, setSummary] = useState({
+    delayed: 0,
+    alert: 0,
+    on_time: 0,
+    by_association: {} as Record<string, { on_time: number; alert: number; delayed: number }>,
+  });
   const [previousDelayedCount, setPreviousDelayedCount] = useState(0);
   const [selectedAssociation, setSelectedAssociation] = useState<string>('todos');
   const [viewMode, setViewMode] = useState<'cards' | 'analytics'>('cards');
@@ -56,11 +62,23 @@ const AcompanhamentoFullscreen = () => {
 
   // Buscar chamados da página atual e summary
   useEffect(() => {
+    // Não fazer polling no modo analytics (dados são buscados no próprio componente)
+    if (viewMode === 'analytics') {
+      setLoading(false);
+      return; // Sai sem criar interval
+    }
+
     const fetchChamados = async () => {
       try {
         setLoading(true);
         setError(null);
-        const response = await callsService.getOpenCalls(currentPage, perPage, selectedAssociation);
+
+        const response = await callsService.getOpenCalls(
+          currentPage,
+          perPage,
+          selectedAssociation
+        );
+
         setChamados(response.data);
         setPagination(response.pagination);
         setSummary(response.summary);
@@ -72,13 +90,17 @@ const AcompanhamentoFullscreen = () => {
       }
     };
 
+    // Buscar dados imediatamente
     fetchChamados();
 
-    // Atualizar a cada 10 segundos
+    // Criar interval de 10 segundos (só no modo cards)
     const interval = setInterval(fetchChamados, 10000);
 
-    return () => clearInterval(interval);
-  }, [currentPage, selectedAssociation]);
+    // Cleanup: limpar interval quando mudar de modo ou desmontar
+    return () => {
+      clearInterval(interval);
+    };
+  }, [currentPage, selectedAssociation, viewMode]);
 
   const handlePreviousPage = () => {
     if (currentPage > 1) {
@@ -197,12 +219,12 @@ const AcompanhamentoFullscreen = () => {
         // Tocar o som
         audio.play();
 
-        // Parar após 2 segundos
+        // Parar após 2.5 segundos
         setTimeout(() => {
           if (audio.isPlaying()) {
             audio.pause();
           }
-        }, 2000);
+        }, 2500);
       } catch (error) {
         console.log("Não foi possível iniciar o som automaticamente.");
       }
@@ -307,17 +329,79 @@ const AcompanhamentoFullscreen = () => {
         <div className="flex items-center gap-4">
           {/* Status summary */}
           <div className="flex items-center gap-3 mr-4">
+            {/* Atrasados */}
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-red-500" />
               <span className="text-sm font-medium">{delayedCount} Atrasados</span>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button className="p-0.5 hover:bg-muted rounded-full transition-colors">
+                      <HelpCircle className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground transition-colors" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="font-semibold mb-1">🔴 Atrasados</p>
+                    <p className="text-xs">
+                      Chamados que ultrapassaram o prazo de conclusão.
+                      Requerem atenção imediata.
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Critério: Passou do horário previsto
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
+
+            {/* Alertas */}
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-amber-500" />
               <span className="text-sm font-medium">{alertCount} Alertas</span>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button className="p-0.5 hover:bg-muted rounded-full transition-colors">
+                      <HelpCircle className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground transition-colors" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="font-semibold mb-1">⚠️ Alertas</p>
+                    <p className="text-xs">
+                      Chamados próximos ao prazo limite.
+                      Devem ser monitorados com atenção.
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Critério: Faltam entre 1 e 10 minutos para o prazo
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
+
+            {/* No Prazo */}
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-emerald-500" />
               <span className="text-sm font-medium">{normalCount} No prazo</span>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button className="p-0.5 hover:bg-muted rounded-full transition-colors">
+                      <HelpCircle className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground transition-colors" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="font-semibold mb-1">✅ No Prazo</p>
+                    <p className="text-xs">
+                      Chamados dentro do tempo esperado de conclusão.
+                      Operação normal.
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Critério: Faltam mais de 10 minutos para o prazo
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
           </div>
 
@@ -374,7 +458,7 @@ const AcompanhamentoFullscreen = () => {
 
       {/* Filtro por Cliente */}
       {viewMode === 'analytics' ? (
-        <AnalyticsView summary={summary} chamados={chamados} />
+        <AnalyticsView />
       ) : (
         <>
       <div className="mb-6">
@@ -415,6 +499,90 @@ const AcompanhamentoFullscreen = () => {
         </Card>
       </div>
 
+      {/* Cards de Métricas por Associação */}
+      {summary.by_association && Object.keys(summary.by_association).length > 0 && (
+        <div className="mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {['solidy', 'nova', 'motoclub', 'aprovel']
+              .filter(association => summary.by_association[association])
+              .map((association) => {
+              const data = summary.by_association[association];
+              const total = data.delayed + data.alert + data.on_time;
+              const associationConfig = {
+                solidy: { label: 'Solidy', color: 'from-green-500 to-green-600', border: 'border-green-500' },
+                nova: { label: 'Nova', color: 'from-blue-500 to-blue-600', border: 'border-blue-500' },
+                motoclub: { label: 'Motoclub', color: 'from-orange-500 to-orange-600', border: 'border-orange-500' },
+                aprovel: { label: 'Aprovel', color: 'from-teal-500 to-teal-600', border: 'border-teal-500' },
+              }[association] || { label: association, color: 'from-slate-500 to-slate-600', border: 'border-slate-500' };
+
+              return (
+                <Card
+                  key={association}
+                  className={cn(
+                    "border-2 rounded-2xl shadow-md hover:shadow-lg transition-all duration-300",
+                    associationConfig.border
+                  )}
+                >
+                  <CardContent className="p-4">
+                    {/* Header com nome da associação */}
+                    <div className={cn(
+                      "mb-3 pb-2 border-b-2",
+                      associationConfig.border
+                    )}>
+                      <h3 className={cn(
+                        "text-lg font-bold bg-gradient-to-r bg-clip-text text-transparent",
+                        associationConfig.color
+                      )}>
+                        {associationConfig.label}
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Total: {total} {total === 1 ? 'chamado' : 'chamados'}
+                      </p>
+                    </div>
+
+                    {/* Métricas */}
+                    <div className="space-y-2">
+                      {/* Atrasados */}
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-red-50 dark:bg-red-950/20">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-red-500" />
+                          <span className="text-sm font-medium">Atrasados</span>
+                        </div>
+                        <span className="text-lg font-bold text-red-600 dark:text-red-400">
+                          {data.delayed}
+                        </span>
+                      </div>
+
+                      {/* Alertas */}
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-amber-50 dark:bg-amber-950/20">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-amber-500" />
+                          <span className="text-sm font-medium">Alertas</span>
+                        </div>
+                        <span className="text-lg font-bold text-amber-600 dark:text-amber-400">
+                          {data.alert}
+                        </span>
+                      </div>
+
+                      {/* No Prazo */}
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/20">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                          <span className="text-sm font-medium">No Prazo</span>
+                        </div>
+                        <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                          {data.on_time}
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Grid de Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
         {chamados.map((call) => {
@@ -429,8 +597,75 @@ const AcompanhamentoFullscreen = () => {
               )}
             >
               <CardContent className="p-5 space-y-4">
-                {/* Badge de status */}
-                <div className="flex justify-end">
+                {/* Header com Badge de status e Ícone de Ajuda */}
+                <div className="flex justify-between items-start">
+                  {/* Ícone de Ajuda */}
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button className="p-1 hover:bg-muted rounded-full transition-colors">
+                          <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="max-w-xs p-4">
+                        <div className="space-y-2 text-xs">
+                          <p className="font-semibold text-sm mb-2">Informações do Card</p>
+
+                          <div>
+                            <span className="font-semibold">Usuário:</span>
+                            <span className="text-muted-foreground ml-1">Nome do associado/cliente que solicitou o atendimento</span>
+                          </div>
+
+                          <div>
+                            <span className="font-semibold">Cliente:</span>
+                            <span className="text-muted-foreground ml-1">Associação ou empresa responsável (Solidy, Nova, Motoclub, etc.)</span>
+                          </div>
+
+                          <div>
+                            <span className="font-semibold">Atendente:</span>
+                            <span className="text-muted-foreground ml-1">Responsável que está atendendo o chamado</span>
+                          </div>
+
+                          <div>
+                            <span className="font-semibold">Veículo:</span>
+                            <span className="text-muted-foreground ml-1">Informações do veículo (marca, modelo e placa)</span>
+                          </div>
+
+                          <div className="pt-2 border-t">
+                            <span className="font-semibold">Início:</span>
+                            <span className="text-muted-foreground ml-1">Data/hora que o chamado foi criado</span>
+                          </div>
+
+                          <div>
+                            <span className="font-semibold">Prev. Chegada:</span>
+                            <span className="text-muted-foreground ml-1">Previsão de chegada do guincho ao local</span>
+                          </div>
+
+                          <div>
+                            <span className="font-semibold">Prev. Conclusão:</span>
+                            <span className="text-muted-foreground ml-1">Previsão de conclusão total do atendimento</span>
+                          </div>
+
+                          <div className="pt-2 border-t">
+                            <span className="font-semibold">Distância:</span>
+                            <span className="text-muted-foreground ml-1">Distância em km até o local do chamado</span>
+                          </div>
+
+                          <div>
+                            <span className="font-semibold">Chegada:</span>
+                            <span className="text-muted-foreground ml-1">Tempo estimado de chegada em minutos</span>
+                          </div>
+
+                          <div>
+                            <span className="font-semibold">Serviço:</span>
+                            <span className="text-muted-foreground ml-1">Duração estimada para conclusão do serviço</span>
+                          </div>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+
+                  {/* Badge de status */}
                   <span className={cn(
                     "text-xs font-semibold px-2.5 py-1 rounded-full",
                     styles.badge
@@ -659,64 +894,129 @@ const AcompanhamentoFullscreen = () => {
   );
 };
 
-// Dados mockados para teste
-const mockSummary = { delayed: 8, alert: 15, on_time: 42 };
-const mockChamados: OpenCall[] = [
-  { id: 1, timeStatus: 'delayed', associado: { name: 'João Silva', association: 'solidy' }, atendente: { name: 'Maria' }, veiculo: { brand: 'Fiat', model: 'Uno', plate: 'ABC-1234' }, created_at: '10:30', expected_arrival_date: '11:00', expected_completion_date: '12:00' },
-  { id: 2, timeStatus: 'alert', associado: { name: 'Pedro Santos', association: 'nova' }, atendente: { name: 'Carlos' }, veiculo: { brand: 'VW', model: 'Gol', plate: 'DEF-5678' }, created_at: '11:00', expected_arrival_date: '11:30', expected_completion_date: '12:30' },
-  { id: 3, timeStatus: 'on_time', associado: { name: 'Ana Costa', association: 'motoclub' }, atendente: { name: 'João' }, veiculo: { brand: 'Honda', model: 'CG 160', plate: 'GHI-9012' }, created_at: '11:15', expected_arrival_date: '12:00', expected_completion_date: '13:00' },
-  { id: 4, timeStatus: 'on_time', associado: { name: 'Lucas Oliveira', association: 'aprovel' }, atendente: { name: 'Ana' }, veiculo: { brand: 'Chevrolet', model: 'Onix', plate: 'JKL-3456' }, created_at: '11:30', expected_arrival_date: '12:15', expected_completion_date: '13:15' },
-  { id: 5, timeStatus: 'delayed', associado: { name: 'Mariana Lima', association: 'solidy' }, atendente: { name: 'Pedro' }, veiculo: { brand: 'Ford', model: 'Ka', plate: 'MNO-7890' }, created_at: '09:00', expected_arrival_date: '09:30', expected_completion_date: '10:30' },
-  { id: 6, timeStatus: 'alert', associado: { name: 'Rafael Souza', association: 'nova' }, atendente: { name: 'Lucas' }, veiculo: { brand: 'Toyota', model: 'Corolla', plate: 'PQR-1234' }, created_at: '10:45', expected_arrival_date: '11:15', expected_completion_date: '12:15' },
-  { id: 7, timeStatus: 'on_time', associado: { name: 'Fernanda Alves', association: 'motoclub' }, atendente: { name: 'Fernanda' }, veiculo: { brand: 'Yamaha', model: 'Factor', plate: 'STU-5678' }, created_at: '11:45', expected_arrival_date: '12:30', expected_completion_date: '13:30' },
-  { id: 8, timeStatus: 'on_time', associado: { name: 'Bruno Ferreira', association: 'solidy' }, atendente: { name: 'Bruno' }, veiculo: { brand: 'Hyundai', model: 'HB20', plate: 'VWX-9012' }, created_at: '12:00', expected_arrival_date: '12:45', expected_completion_date: '13:45' },
-] as any;
-
 // Componente de Visão Analítica com design elegante
-interface AnalyticsViewProps {
-  summary: { delayed: number; alert: number; on_time: number };
-  chamados: OpenCall[];
-}
+interface AnalyticsViewProps {}
 
-const AnalyticsView = ({ summary, chamados }: AnalyticsViewProps) => {
+const AnalyticsView = ({}: AnalyticsViewProps) => {
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
+  const [analyticsData, setAnalyticsData] = useState<{
+    delayed: number;
+    alert: number;
+    on_time: number;
+    evolution_by_hour: Array<{ hour: string; on_time: number; alert: number; delayed: number }>;
+    by_association: Record<string, { on_time: number; alert: number; delayed: number }>;
+  }>({
+    delayed: 0,
+    alert: 0,
+    on_time: 0,
+    evolution_by_hour: [],
+    by_association: {},
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Usar dados mockados se não houver dados reais
-  const useMock = chamados.length === 0;
-  const displaySummary = useMock ? mockSummary : summary;
-  const displayChamados = useMock ? mockChamados : chamados;
-  const total = displaySummary.delayed + displaySummary.alert + displaySummary.on_time;
+  // Inicializar com primeiro e último dia do mês vigente
+  useEffect(() => {
+    const hoje = new Date();
+    setStartDate(startOfMonth(hoje));
+    setEndDate(endOfMonth(hoje));
+  }, []);
 
-  // Agrupar por cliente
-  const clienteData = displayChamados.reduce((acc, call) => {
-    const cliente = call.associado?.association || 'Não definido';
-    if (!acc[cliente]) {
-      acc[cliente] = { delayed: 0, alert: 0, on_time: 0 };
+  // Buscar dados analíticos quando as datas mudarem
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const startByHour = startDate ? format(startDate, 'yyyy-MM-dd') : undefined;
+        const endByHour = endDate ? format(endDate, 'yyyy-MM-dd') : undefined;
+
+        console.log('📊 Buscando dados analíticos:', { startByHour, endByHour });
+        const response = await callsService.getAnalytics(startByHour, endByHour);
+        console.log('📊 Resposta do endpoint analítico:', response);
+
+        // A resposta do /analitico vem direto, sem wrapper "summary"
+        if (response) {
+          console.log('✅ Dados analíticos recebidos:', response);
+          setAnalyticsData({
+            delayed: response.delayed || 0,
+            alert: response.alert || 0,
+            on_time: response.on_time || 0,
+            evolution_by_hour: response.evolution_by_hour || [],
+            by_association: response.by_association || {},
+          });
+        } else {
+          console.warn('⚠️ Resposta vazia:', response);
+        }
+      } catch (err) {
+        console.error('❌ Erro ao buscar dados analíticos:', err);
+        setError('Não foi possível carregar os dados analíticos. A página será atualizada automaticamente.');
+        // Manter dados zerados em caso de erro
+        setAnalyticsData({
+          delayed: 0,
+          alert: 0,
+          on_time: 0,
+          evolution_by_hour: [],
+          by_association: {},
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Só buscar se tiver as datas inicializadas
+    if (startDate && endDate) {
+      fetchAnalytics();
     }
-    if (call.timeStatus === 'delayed') acc[cliente].delayed++;
-    else if (call.timeStatus === 'alert') acc[cliente].alert++;
-    else acc[cliente].on_time++;
-    return acc;
-  }, {} as Record<string, { delayed: number; alert: number; on_time: number }>);
+  }, [startDate, endDate]);
 
-  const clienteBarData = Object.entries(clienteData).map(([name, data]) => ({
-    name: name.charAt(0).toUpperCase() + name.slice(1).toLowerCase(),
-    Atrasados: data.delayed,
-    Alertas: data.alert,
-    'No Prazo': data.on_time,
-    total: data.delayed + data.alert + data.on_time,
-  }));
+  // Loading state
+  if (loading) {
+    return (
+      <div className="space-y-6 animate-fade-in bg-slate-50 dark:bg-background -mx-6 -mb-6 px-6 pb-6 pt-2 min-h-[calc(100vh-200px)] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <p className="text-muted-foreground">Carregando dados analíticos...</p>
+        </div>
+      </div>
+    );
+  }
 
-  // Dados para gráfico de linha (evolução por hora)
-  const lineData = [
-    { hora: '08h', atrasados: 2, alertas: 3, noPrazo: 12 },
-    { hora: '09h', atrasados: 3, alertas: 5, noPrazo: 18 },
-    { hora: '10h', atrasados: 5, alertas: 8, noPrazo: 25 },
-    { hora: '11h', atrasados: 4, alertas: 10, noPrazo: 32 },
-    { hora: '12h', atrasados: 6, alertas: 12, noPrazo: 38 },
-    { hora: '13h', atrasados: 8, alertas: 15, noPrazo: 42 },
-  ];
+  // Error state
+  if (error) {
+    return (
+      <div className="space-y-6 animate-fade-in bg-slate-50 dark:bg-background -mx-6 -mb-6 px-6 pb-6 pt-2 min-h-[calc(100vh-200px)] flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+          <p className="text-destructive font-semibold mb-2">Erro ao carregar dados analíticos</p>
+          <p className="text-muted-foreground text-sm">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Calcular dados apenas quando não está em loading ou erro
+  const total = analyticsData.delayed + analyticsData.alert + analyticsData.on_time;
+
+  // Dados de evolução por hora da API
+  const evolutionData = analyticsData.evolution_by_hour?.map(item => ({
+    hora: item.hour.substring(0, 2) + 'h', // "00:00" -> "00h"
+    atrasados: item.delayed,
+    alertas: item.alert,
+    noPrazo: item.on_time,
+  })) || [];
+
+  // Dados por associação da API
+  const associationData = analyticsData.by_association
+    ? Object.entries(analyticsData.by_association).map(([name, data]) => ({
+        name: name.charAt(0).toUpperCase() + name.slice(1).toLowerCase(),
+        Atrasados: data.delayed,
+        Alertas: data.alert,
+        'No Prazo': data.on_time,
+        total: data.delayed + data.alert + data.on_time,
+      }))
+    : [];
 
   // Cores do tema (inspirado na referência)
   const colors = {
@@ -730,12 +1030,6 @@ const AnalyticsView = ({ summary, chamados }: AnalyticsViewProps) => {
 
   return (
     <div className="space-y-6 animate-fade-in bg-slate-50 dark:bg-background -mx-6 -mb-6 px-6 pb-6 pt-2 min-h-[calc(100vh-200px)]">
-      {useMock && (
-        <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl p-3 text-center">
-          <p className="text-sm text-blue-600 dark:text-blue-400">📊 Exibindo dados de demonstração</p>
-        </div>
-      )}
-      
       {/* Layout principal em grid */}
       <div className="grid grid-cols-12 gap-4">
         {/* Coluna de métricas à esquerda */}
@@ -751,7 +1045,7 @@ const AnalyticsView = ({ summary, chamados }: AnalyticsViewProps) => {
           {/* Card Atrasados */}
           <Card className="bg-white dark:bg-card border border-slate-200 dark:border-border rounded-xl shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="p-4 text-center">
-              <p className="text-3xl font-bold" style={{ color: colors.accent }}>{displaySummary.delayed}</p>
+              <p className="text-3xl font-bold" style={{ color: colors.accent }}>{analyticsData.delayed}</p>
               <p className="text-xs text-muted-foreground mt-1">Atrasados</p>
             </CardContent>
           </Card>
@@ -759,7 +1053,7 @@ const AnalyticsView = ({ summary, chamados }: AnalyticsViewProps) => {
           {/* Card Alertas */}
           <Card className="bg-white dark:bg-card border border-slate-200 dark:border-border rounded-xl shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="p-4 text-center">
-              <p className="text-3xl font-bold" style={{ color: colors.warning }}>{displaySummary.alert}</p>
+              <p className="text-3xl font-bold" style={{ color: colors.warning }}>{analyticsData.alert}</p>
               <p className="text-xs text-muted-foreground mt-1">Alertas</p>
             </CardContent>
           </Card>
@@ -767,18 +1061,8 @@ const AnalyticsView = ({ summary, chamados }: AnalyticsViewProps) => {
           {/* Card No Prazo */}
           <Card className="bg-white dark:bg-card border border-slate-200 dark:border-border rounded-xl shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="p-4 text-center">
-              <p className="text-3xl font-bold" style={{ color: colors.success }}>{displaySummary.on_time}</p>
+              <p className="text-3xl font-bold" style={{ color: colors.success }}>{analyticsData.on_time}</p>
               <p className="text-xs text-muted-foreground mt-1">No Prazo</p>
-            </CardContent>
-          </Card>
-
-          {/* Card Percentual */}
-          <Card className="bg-white dark:bg-card border border-slate-200 dark:border-border rounded-xl shadow-sm hover:shadow-md transition-shadow">
-            <CardContent className="p-4 text-center">
-              <p className="text-3xl font-bold" style={{ color: colors.primary }}>
-                {total > 0 ? ((displaySummary.on_time / total) * 100).toFixed(0) : 0}%
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">Taxa Sucesso</p>
             </CardContent>
           </Card>
         </div>
@@ -860,7 +1144,7 @@ const AnalyticsView = ({ summary, chamados }: AnalyticsViewProps) => {
               </div>
               <div className="h-[220px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={lineData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                  <AreaChart data={evolutionData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                     <defs>
                       <linearGradient id="colorNoPrazo" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor={colors.primary} stopOpacity={0.3}/>
@@ -870,7 +1154,7 @@ const AnalyticsView = ({ summary, chamados }: AnalyticsViewProps) => {
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                     <XAxis dataKey="hora" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <Tooltip
+                    <RechartsTooltip
                       contentStyle={{
                         backgroundColor: '#fff',
                         border: '1px solid #e2e8f0',
@@ -893,11 +1177,11 @@ const AnalyticsView = ({ summary, chamados }: AnalyticsViewProps) => {
               <h3 className="text-base font-semibold text-foreground mb-4">Por Cliente</h3>
               <div className="h-[200px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={clienteBarData} layout="vertical" margin={{ top: 5, right: 30, left: 50, bottom: 5 }}>
+                  <BarChart data={associationData} layout="vertical" margin={{ top: 5, right: 30, left: 50, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
                     <XAxis type="number" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
                     <YAxis dataKey="name" type="category" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} width={60} />
-                    <Tooltip
+                    <RechartsTooltip
                       contentStyle={{
                         backgroundColor: '#fff',
                         border: '1px solid #e2e8f0',
@@ -923,8 +1207,8 @@ const AnalyticsView = ({ summary, chamados }: AnalyticsViewProps) => {
                   <PieChart>
                     <Pie
                       data={[
-                        { name: 'Atrasados', value: displaySummary.delayed },
-                        { name: 'Outros', value: total - displaySummary.delayed },
+                        { name: 'Atrasados', value: analyticsData.delayed },
+                        { name: 'Outros', value: total - analyticsData.delayed },
                       ]}
                       cx="50%"
                       cy="50%"
@@ -940,9 +1224,9 @@ const AnalyticsView = ({ summary, chamados }: AnalyticsViewProps) => {
                 </ResponsiveContainer>
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="text-center">
-                    <p className="text-2xl font-bold" style={{ color: colors.accent }}>{displaySummary.delayed}</p>
+                    <p className="text-2xl font-bold" style={{ color: colors.accent }}>{analyticsData.delayed}</p>
                     <p className="text-[10px] text-muted-foreground">
-                      {total > 0 ? ((displaySummary.delayed / total) * 100).toFixed(0) : 0}%
+                      {total > 0 ? ((analyticsData.delayed / total) * 100).toFixed(0) : 0}%
                     </p>
                   </div>
                 </div>
@@ -969,8 +1253,8 @@ const AnalyticsView = ({ summary, chamados }: AnalyticsViewProps) => {
                   <PieChart>
                     <Pie
                       data={[
-                        { name: 'No Prazo', value: displaySummary.on_time },
-                        { name: 'Outros', value: total - displaySummary.on_time },
+                        { name: 'No Prazo', value: analyticsData.on_time },
+                        { name: 'Outros', value: total - analyticsData.on_time },
                       ]}
                       cx="50%"
                       cy="50%"
@@ -986,9 +1270,9 @@ const AnalyticsView = ({ summary, chamados }: AnalyticsViewProps) => {
                 </ResponsiveContainer>
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="text-center">
-                    <p className="text-2xl font-bold" style={{ color: colors.primary }}>{displaySummary.on_time}</p>
+                    <p className="text-2xl font-bold" style={{ color: colors.primary }}>{analyticsData.on_time}</p>
                     <p className="text-[10px] text-muted-foreground">
-                      {total > 0 ? ((displaySummary.on_time / total) * 100).toFixed(0) : 0}%
+                      {total > 0 ? ((analyticsData.on_time / total) * 100).toFixed(0) : 0}%
                     </p>
                   </div>
                 </div>

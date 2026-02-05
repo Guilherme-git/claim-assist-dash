@@ -383,6 +383,33 @@ export interface OpenCallsResponse {
     delayed: number;
     alert: number;
     on_time: number;
+    by_association: {
+      [key: string]: {
+        on_time: number;
+        alert: number;
+        delayed: number;
+      };
+    };
+  };
+}
+
+export interface AnalyticsResponse {
+  total: number;
+  delayed: number;
+  alert: number;
+  on_time: number;
+  evolution_by_hour: Array<{
+    hour: string;
+    on_time: number;
+    alert: number;
+    delayed: number;
+  }>;
+  by_association: {
+    [key: string]: {
+      on_time: number;
+      alert: number;
+      delayed: number;
+    };
   };
 }
 
@@ -645,12 +672,46 @@ export const callsService = {
    * GET /api/calls/guinchos/open
    * Busca chamados em aberto para monitoramento
    */
-  getOpenCalls: async (page: number = 1, limit: number = 50, association?: string): Promise<OpenCallsResponse> => {
+  getOpenCalls: async (
+    page: number = 1,
+    limit: number = 50,
+    association?: string,
+    evolutionStartDate?: string,
+    evolutionEndDate?: string
+  ): Promise<OpenCallsResponse> => {
     const params: Record<string, string | number> = { page, limit };
     if (association && association !== 'todos') {
       params.association = association;
     }
+    if (evolutionStartDate) {
+      params.evolution_start_date = evolutionStartDate;
+    }
+    if (evolutionEndDate) {
+      params.evolution_end_date = evolutionEndDate;
+    }
     const { data } = await api.get<OpenCallsResponse>('/api/calls/guinchos/open', {
+      params,
+    });
+    return data;
+  },
+
+  /**
+   * GET /api/calls/guinchos/open/analitico
+   * Busca dados analíticos dos chamados em aberto
+   * Filtros disponíveis: start_by_hour, end_by_hour
+   */
+  getAnalytics: async (
+    startByHour?: string,
+    endByHour?: string
+  ): Promise<AnalyticsResponse> => {
+    const params: Record<string, string> = {};
+    if (startByHour) {
+      params.start_by_hour = startByHour;
+    }
+    if (endByHour) {
+      params.end_by_hour = endByHour;
+    }
+    const { data } = await api.get<AnalyticsResponse>('/api/calls/guinchos/open/analitico', {
       params,
     });
     return data;
