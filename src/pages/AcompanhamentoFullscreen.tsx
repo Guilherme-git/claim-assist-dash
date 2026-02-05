@@ -1,6 +1,8 @@
 import { User, Car, Calendar, Clock, Maximize2, Minimize2, Volume2, VolumeX, Loader2, AlertCircle, ChevronLeft, ChevronRight, MapPin as RouteIcon, Timer, Wrench, Building2 } from "lucide-react";
+import { LayoutGrid, BarChart3 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { formatDateTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useRef } from "react";
@@ -45,6 +47,7 @@ const AcompanhamentoFullscreen = () => {
   const [summary, setSummary] = useState({ delayed: 0, alert: 0, on_time: 0 });
   const [previousDelayedCount, setPreviousDelayedCount] = useState(0);
   const [selectedAssociation, setSelectedAssociation] = useState<string>('todos');
+  const [viewMode, setViewMode] = useState<'cards' | 'analytics'>('cards');
   const perPage = 20;
 
   // Buscar chamados da página atual e summary
@@ -314,6 +317,28 @@ const AcompanhamentoFullscreen = () => {
             </div>
           </div>
 
+          {/* Toggle View Buttons */}
+          <div className="flex items-center bg-muted rounded-xl p-1">
+            <Button
+              variant={viewMode === 'cards' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('cards')}
+              className="rounded-lg gap-2"
+            >
+              <LayoutGrid className="h-4 w-4" />
+              Cards
+            </Button>
+            <Button
+              variant={viewMode === 'analytics' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('analytics')}
+              className="rounded-lg gap-2"
+            >
+              <BarChart3 className="h-4 w-4" />
+              Análise
+            </Button>
+          </div>
+
           <Button
             variant={isMuted ? "destructive" : "default"}
             size="icon"
@@ -344,6 +369,10 @@ const AcompanhamentoFullscreen = () => {
       </div>
 
       {/* Filtro por Cliente */}
+      {viewMode === 'analytics' ? (
+        <AnalyticsView summary={summary} chamados={chamados} />
+      ) : (
+        <>
       <div className="mb-6">
         <Card className="p-4 rounded-2xl border-border/50 shadow-soft bg-gradient-to-br from-card to-card/50">
           <div className="flex flex-col gap-3">
@@ -619,6 +648,211 @@ const AcompanhamentoFullscreen = () => {
             </Button>
           </div>
         </div>
+      )}
+        </>
+      )}
+    </div>
+  );
+};
+
+// Componente de Visão Analítica
+interface AnalyticsViewProps {
+  summary: { delayed: number; alert: number; on_time: number };
+  chamados: OpenCall[];
+}
+
+const AnalyticsView = ({ summary, chamados }: AnalyticsViewProps) => {
+  const total = summary.delayed + summary.alert + summary.on_time;
+  
+  const pieData = [
+    { name: 'Atrasados', value: summary.delayed, color: '#ef4444' },
+    { name: 'Alertas', value: summary.alert, color: '#f59e0b' },
+    { name: 'No Prazo', value: summary.on_time, color: '#10b981' },
+  ];
+
+  const barData = [
+    { name: 'Atrasados', quantidade: summary.delayed, fill: '#ef4444' },
+    { name: 'Alertas', quantidade: summary.alert, fill: '#f59e0b' },
+    { name: 'No Prazo', quantidade: summary.on_time, fill: '#10b981' },
+  ];
+
+  // Agrupar por cliente
+  const clienteData = chamados.reduce((acc, call) => {
+    const cliente = call.associado?.association || 'Não definido';
+    if (!acc[cliente]) {
+      acc[cliente] = { delayed: 0, alert: 0, on_time: 0 };
+    }
+    if (call.timeStatus === 'delayed') acc[cliente].delayed++;
+    else if (call.timeStatus === 'alert') acc[cliente].alert++;
+    else acc[cliente].on_time++;
+    return acc;
+  }, {} as Record<string, { delayed: number; alert: number; on_time: number }>);
+
+  const clienteBarData = Object.entries(clienteData).map(([name, data]) => ({
+    name: name.charAt(0).toUpperCase() + name.slice(1).toLowerCase(),
+    Atrasados: data.delayed,
+    Alertas: data.alert,
+    'No Prazo': data.on_time,
+  }));
+
+  return (
+    <div className="space-y-6">
+      {/* Cards de métricas */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="bg-card border-border/50 rounded-2xl">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Total de Chamados</p>
+                <p className="text-3xl font-bold text-foreground">{total}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-primary/10">
+                <BarChart3 className="h-6 w-6 text-primary" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-900/50 rounded-2xl">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-red-600 dark:text-red-400">Atrasados</p>
+                <p className="text-3xl font-bold text-red-700 dark:text-red-300">{summary.delayed}</p>
+                <p className="text-xs text-red-500">{total > 0 ? ((summary.delayed / total) * 100).toFixed(1) : 0}%</p>
+              </div>
+              <div className="p-3 rounded-xl bg-red-500/20">
+                <AlertCircle className="h-6 w-6 text-red-500" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/50 rounded-2xl">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-amber-600 dark:text-amber-400">Alertas</p>
+                <p className="text-3xl font-bold text-amber-700 dark:text-amber-300">{summary.alert}</p>
+                <p className="text-xs text-amber-500">{total > 0 ? ((summary.alert / total) * 100).toFixed(1) : 0}%</p>
+              </div>
+              <div className="p-3 rounded-xl bg-amber-500/20">
+                <Clock className="h-6 w-6 text-amber-500" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900/50 rounded-2xl">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-emerald-600 dark:text-emerald-400">No Prazo</p>
+                <p className="text-3xl font-bold text-emerald-700 dark:text-emerald-300">{summary.on_time}</p>
+                <p className="text-xs text-emerald-500">{total > 0 ? ((summary.on_time / total) * 100).toFixed(1) : 0}%</p>
+              </div>
+              <div className="p-3 rounded-xl bg-emerald-500/20">
+                <Timer className="h-6 w-6 text-emerald-500" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Gráficos */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Gráfico de Pizza */}
+        <Card className="bg-card border-border/50 rounded-2xl">
+          <CardContent className="p-6">
+            <h3 className="text-lg font-semibold text-foreground mb-4">Distribuição por Status</h3>
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={5}
+                    dataKey="value"
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    labelLine={false}
+                  >
+                    {pieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "12px",
+                    }}
+                  />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Gráfico de Barras por Status */}
+        <Card className="bg-card border-border/50 rounded-2xl">
+          <CardContent className="p-6">
+            <h3 className="text-lg font-semibold text-foreground mb-4">Quantidade por Status</h3>
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={barData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "12px",
+                    }}
+                  />
+                  <Bar dataKey="quantidade" radius={[8, 8, 0, 0]}>
+                    {barData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Gráfico por Cliente */}
+      {clienteBarData.length > 0 && (
+        <Card className="bg-card border-border/50 rounded-2xl">
+          <CardContent className="p-6">
+            <h3 className="text-lg font-semibold text-foreground mb-4">Chamados por Cliente</h3>
+            <div className="h-[350px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={clienteBarData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "12px",
+                    }}
+                  />
+                  <Legend />
+                  <Bar dataKey="Atrasados" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Alertas" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="No Prazo" fill="#10b981" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
