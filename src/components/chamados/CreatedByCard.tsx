@@ -22,7 +22,7 @@ export function CreatedByCard({ user }: CreatedByCardProps) {
             <UserCog className="h-5 w-5 text-cyan-500" />
           </div>
           <div>
-            <CardTitle className="text-lg">Criado por</CardTitle>
+            <CardTitle className="text-lg">Atribuído para</CardTitle>
             <CardDescription>Operador responsável</CardDescription>
           </div>
         </div>

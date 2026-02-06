@@ -340,6 +340,10 @@ export function ChamadoFormModal({ open, onOpenChange, onSuccess }: ChamadoFormM
   const onSubmit = async (data: ChamadoFormData) => {
     setIsSubmitting(true);
     try {
+      // Pegar usuário logado do localStorage
+      const userStr = localStorage.getItem('user');
+      const user = userStr ? JSON.parse(userStr) : null;
+
       const payload: any = {
         associate_car_id: parseInt(data.associate_vehicle_id),
         address: data.address,
@@ -352,6 +356,7 @@ export function ChamadoFormModal({ open, onOpenChange, onSuccess }: ChamadoFormM
         },
         uf_id: 1, // TODO: Obter do endereço ou formulário
         city_id: 1, // TODO: Obter do endereço ou formulário
+        user_id: user?.id ? parseInt(user.id) : undefined,
       };
 
       if (showDestination && data.destination?.location) {

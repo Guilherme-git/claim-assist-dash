@@ -36,8 +36,10 @@ import {
   Truck,
   Wrench,
   Plus,
+  ArrowRightLeft,
 } from "lucide-react";
 import { ChamadoFormModal } from "@/components/chamados/chamadoFormModal";
+import { TransferCallModal } from "@/components/chamados/TransferCallModal";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -88,6 +90,8 @@ export default function Chamados() {
   const [statusFilter, setStatusFilter] = useState<string>("todos");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [selectedCallForTransfer, setSelectedCallForTransfer] = useState<Call | null>(null);
 
   // Função para buscar chamados (reutilizável)
   const fetchChamados = useCallback(async () => {
@@ -255,6 +259,14 @@ export default function Chamados() {
         onSuccess={handleChamadoCreated}
       />
 
+      {/* Modal de Transferência de Chamado */}
+      <TransferCallModal
+        open={isTransferModalOpen}
+        onOpenChange={setIsTransferModalOpen}
+        call={selectedCallForTransfer}
+        onSuccess={fetchChamados}
+      />
+
       {/* Tabela Principal */}
       <Card className="rounded-2xl border-border/50 shadow-soft">
         <CardHeader className="pb-4">
@@ -310,6 +322,7 @@ export default function Chamados() {
                     <TableHead className="w-[80px]">ID</TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead>Usuário</TableHead>
+                    <TableHead>Atendente</TableHead>
                     <TableHead>Veículo</TableHead>
                     <TableHead>Serviço</TableHead>
                     <TableHead>Status</TableHead>
@@ -348,7 +361,7 @@ export default function Chamados() {
                               <User className="h-4 w-4 text-muted-foreground" />
                             </div>
                             <div>
-                              <p className="font-medium text-sm">
+                              <p className="font-medium text-mg">
                                 {chamado.associate_cars?.associates?.name || "—"}
                               </p>
                               <p className="text-xs text-muted-foreground">
@@ -357,6 +370,29 @@ export default function Chamados() {
                                   : "—"}
                               </p>
                             </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {chamado.users ? (
+                              <>
+                                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                  <span className="text-xs font-semibold text-primary">
+                                    {chamado.users.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()}
+                                  </span>
+                                </div>
+                                <div>
+                                  <p className="font-medium text-sm">
+                                    {chamado.users.name}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {chamado.users.email}
+                                  </p>
+                                </div>
+                              </>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">Não atribuído</span>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -433,9 +469,16 @@ export default function Chamados() {
                                 </DropdownMenuItem>
                               )}
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem>
-                                <Truck className="h-4 w-4 mr-2" />
-                                Atribuir Prestador
+                              <DropdownMenuItem
+                                className="cursor-pointer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedCallForTransfer(chamado);
+                                  setIsTransferModalOpen(true);
+                                }}
+                              >
+                                <ArrowRightLeft className="h-4 w-4 mr-2" />
+                                Transferir Atendente
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>

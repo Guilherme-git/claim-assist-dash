@@ -129,21 +129,31 @@ export interface AtendimentosFilters {
   request_reason?: string;
   plataform?: string;
   search?: string;
+  order_by?: string;
+  order?: string;
 }
 
 export const atendimentosService = {
   getAll: async (filters: AtendimentosFilters = {}): Promise<AssociateServicesResponse> => {
-    const { page = 1, status, request_reason, plataform, search } = filters;
+    const { page = 1, status, request_reason, plataform, search, order_by = 'updated_at', order = 'desc' } = filters;
     const params: Record<string, string | number> = { page };
     if (status && status !== 'todos') params.status = status;
     if (request_reason && request_reason !== 'todos') params.request_reason = request_reason;
     if (plataform && plataform !== 'todos') params.plataform = plataform;
     if (search?.trim()) params.search = search.trim();
+    if (order_by) params.order_by = order_by;
+    if (order) params.order = order;
     const { data } = await api.get<AssociateServicesResponse>('/api/associate-services', { params });
     return data;
   },
 
   getById: async (id: string): Promise<AssociateService> => {
+    const { data } = await api.get<AssociateService>(`/api/associate-services/${id}`);
+    return data;
+  },
+
+  // Busca detalhes do atendimento com polling até ter todos os dados
+  getByIdWithPolling: async (id: string): Promise<AssociateService> => {
     const { data } = await api.get<AssociateService>(`/api/associate-services/${id}`);
     return data;
   },

@@ -9,6 +9,7 @@ export interface LoginPayload {
 }
 
 export interface LoginUser {
+  id: string;
   name: string;
   email: string;
 }

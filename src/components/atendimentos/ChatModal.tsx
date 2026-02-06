@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Bot, User, Phone, Clock } from "lucide-react";
 import { formatPhone, formatDateTime } from "@/lib/utils";
-import type { AssociateService } from "@/services/atendimentos.service";
+import { atendimentosService, type AssociateService } from "@/services/atendimentos.service";
+import { useWebSocket } from "@/hooks/useWebSocket";
 
 interface ChatMessage {
   id: string;
@@ -25,124 +26,218 @@ interface ChatModalProps {
   atendimento: AssociateService | null;
 }
 
-// Simula mensagens baseadas no status e dados do atendimento
-function generateMockMessages(atendimento: AssociateService): ChatMessage[] {
+// Labels para o service_form
+const serviceFormLabels: Record<string, string> = {
+  vehicle_is_at_collision_scene: "O veículo está no local da colisão?",
+  vehicle_is_moving: "O veículo está circulando (consegue se mover)?",
+  is_to_activate_protection: "Deseja acionar a proteção para sinistro?",
+  any_wheel_is_locked: "Alguma roda do veículo está travada?",
+  vehicle_is_lowered: "Veículo possui alguma dessas características: baixo, rebaixado?",
+  vehicle_is_easily_accessible: "Acesso fácil para remoção (o guincho consegue chegar ao local com facilidade)?",
+  vehicle_cargo: "Possui carga ou peso? → Se sim, qual tipo e quantidade?",
+  number_of_passengers: "Quantos passageiros possui?",
+  associate_items: "Existem objetos no veículo? → Se sim, quais itens?",
+  documents_and_key_are_in_scene: "Documentos e chaves estão no local?",
+  uber_will_be_necessary: "Vai precisar de táxi/Uber?",
+  vehicle_symptom: "O que aconteceu com o veículo (descreva o que está ocorrendo)?",
+  fuel_request: "Combustível desejado:",
+  fuel_price: "Valor de combustível a ser entregue",
+  fuel_payment_type: "Forma de pagamento:",
+  tire_change_quantity: "Quantos pneus precisam ser trocados?",
+  tire_change_associate_has_tools: "Possui ferramenta pra troca?",
+  tire_change_associate_has_spare_tire: "Possui estepe?",
+  battery_charge_resolution: "Apenas a recarga de bateria já resolveria?",
+  locksmith_key_is_inside_vehicle: "A chave está dentro do veículo?",
+  locksmith_all_doors_locked: "O veículo está com todas as portas trancadas?",
+  accessible_vehicle: "O veículo está de fácil acesso?",
+};
+
+const reasonLabels: Record<string, string> = {
+  collision: "Colisão",
+  fire: "Incêndio",
+  natural_events: "Eventos Naturais",
+  breakdown_by_mechanical_failure_or_electric: "Pane Mecânica ou Elétrica",
+  flat_tire: "Pneu Furado",
+  battery_failure: "Falha na Bateria",
+  locked_vehicle: "Veículo Trancado",
+  empty_tank: "Tanque Vazio",
+  theft_or_robbery: "Furto ou Roubo",
+};
+
+// Gera mensagens baseadas nos dados reais do atendimento
+function generateMessagesFromData(atendimento: AssociateService): ChatMessage[] {
   const messages: ChatMessage[] = [];
   const baseTime = new Date(atendimento.created_at);
-  
+  let timeOffset = 0;
+  let msgId = 1;
+
   // Mensagem inicial da IA
   messages.push({
-    id: "1",
+    id: String(msgId++),
     role: "ai",
     content: "Olá! Sou a assistente virtual da Utiliza. Como posso ajudá-lo hoje?",
-    timestamp: new Date(baseTime.getTime()),
+    timestamp: new Date(baseTime.getTime() + timeOffset),
   });
+  timeOffset += 15000;
 
-  // Resposta do usuário
-  messages.push({
-    id: "2",
-    role: "user",
-    content: "Preciso de assistência, meu carro parou.",
-    timestamp: new Date(baseTime.getTime() + 30000),
-  });
+  console.log('🚗 DEBUG PLACA - associate_cars:', atendimento.associate_cars);
+  console.log('🚗 DEBUG PLACA - plate:', atendimento.associate_cars?.plate);
 
-  // IA pede identificação
+  // Solicita a placa do veículo
   messages.push({
-    id: "3",
+    id: String(msgId++),
     role: "ai",
-    content: "Entendi! Para dar continuidade ao atendimento, preciso confirmar alguns dados. Qual o CPF do titular?",
-    timestamp: new Date(baseTime.getTime() + 45000),
+    content: "Então DIGITE SOMENTE A PLACA do veículo para darmos continuidade ao atendimento. 👇🏼",
+    timestamp: new Date(baseTime.getTime() + timeOffset),
   });
+  timeOffset += 10000;
+  console.log('✅ Mensagem de solicitação da placa adicionada');
 
-  // Usuário responde CPF
-  if (atendimento.associate_cars?.associates?.cpf) {
+  // Placa do veículo (se disponível)
+  if (atendimento.associate_cars?.plate) {
+    console.log('✅ Adicionando resposta com a placa:', atendimento.associate_cars.plate);
     messages.push({
-      id: "4",
+      id: String(msgId++),
       role: "user",
-      content: atendimento.associate_cars.associates.cpf,
-      timestamp: new Date(baseTime.getTime() + 60000),
+      content: atendimento.associate_cars.plate,
+      timestamp: new Date(baseTime.getTime() + timeOffset),
     });
-
-    messages.push({
-      id: "5",
-      role: "ai",
-      content: `Perfeito! Encontrei seu cadastro, ${atendimento.associate_cars.associates.name || "associado"}. Qual o motivo do seu acionamento?`,
-      timestamp: new Date(baseTime.getTime() + 75000),
-    });
+    timeOffset += 10000;
+  } else {
+    console.log('⚠️ Placa não encontrada');
   }
 
-  // Motivo do pedido
+  // Se tem request_reason, adiciona as mensagens de identificação e motivo
   if (atendimento.request_reason) {
-    const reasonLabels: Record<string, string> = {
-      collision: "Colisão",
-      fire: "Incêndio",
-      natural_events: "Eventos Naturais",
-      breakdown_by_mechanical_failure_or_electric: "Pane Mecânica ou Elétrica",
-      flat_tire: "Pneu Furado",
-      battery_failure: "Falha na Bateria",
-      locked_vehicle: "Veículo Trancado",
-      empty_tank: "Tanque Vazio",
-      theft_or_robbery: "Furto ou Roubo",
-    };
-
+    // Pergunta sobre o motivo do contato
     messages.push({
-      id: "6",
+      id: String(msgId++),
+      role: "ai",
+      content: "Qual o motivo do contato?",
+      timestamp: new Date(baseTime.getTime() + timeOffset),
+    });
+    timeOffset += 10000;
+
+    // Motivo do acionamento
+    messages.push({
+      id: String(msgId++),
       role: "user",
       content: reasonLabels[atendimento.request_reason] || atendimento.request_reason,
-      timestamp: new Date(baseTime.getTime() + 90000),
+      timestamp: new Date(baseTime.getTime() + timeOffset),
     });
+    timeOffset += 10000;
 
     messages.push({
-      id: "7",
+      id: String(msgId++),
       role: "ai",
       content: "Entendido. Preciso fazer algumas perguntas para direcionar melhor o atendimento.",
-      timestamp: new Date(baseTime.getTime() + 105000),
+      timestamp: new Date(baseTime.getTime() + timeOffset),
     });
+    timeOffset += 10000;
+  }
+
+  // Processa service_form (respostas do formulário)
+  const raw = atendimento.service_form;
+  console.log('🔍 DEBUG - service_form RAW:', raw);
+
+  let serviceFormPayload: Record<string, string> | undefined;
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    const obj = raw as Record<string, unknown>;
+    const nested = obj.payload;
+    if (nested != null && typeof nested === "object" && !Array.isArray(nested)) {
+      console.log('📦 service_form formato aninhado (payload):', nested);
+      serviceFormPayload = nested as Record<string, string>;
+    } else {
+      const { flow_token: _ft, ...rest } = obj;
+      const flat = rest as Record<string, string>;
+      console.log('📦 service_form formato plano:', flat);
+      serviceFormPayload = Object.keys(flat).length > 0 ? flat : undefined;
+    }
+  }
+
+  console.log('✅ serviceFormPayload final:', serviceFormPayload);
+
+  // Adiciona perguntas e respostas do service_form
+  if (serviceFormPayload) {
+    console.log(`📝 Processando ${Object.keys(serviceFormPayload).length} campos do service_form`);
+    Object.entries(serviceFormPayload).forEach(([key, value]) => {
+      console.log(`  - Campo: ${key} = ${value}`);
+      if (value && value !== "" && value !== "null") {
+        const question = serviceFormLabels[key] || key.replace(/_/g, " ");
+
+        messages.push({
+          id: String(msgId++),
+          role: "ai",
+          content: question,
+          timestamp: new Date(baseTime.getTime() + timeOffset),
+        });
+        timeOffset += 10000;
+
+        messages.push({
+          id: String(msgId++),
+          role: "user",
+          content: String(value),
+          timestamp: new Date(baseTime.getTime() + timeOffset),
+        });
+        timeOffset += 8000;
+      } else {
+        console.log(`  ⚠️ Campo ${key} ignorado (valor vazio ou null)`);
+      }
+    });
+  } else {
+    console.log('❌ Nenhum serviceFormPayload encontrado');
   }
 
   // Localização de origem
   if (atendimento.origin_address) {
     messages.push({
-      id: "8",
+      id: String(msgId++),
       role: "ai",
-      content: "Qual a sua localização atual? Pode enviar o endereço ou compartilhar a localização.",
-      timestamp: new Date(baseTime.getTime() + 120000),
+      content: "Por gentileza, me envie sua localização atual",
+      timestamp: new Date(baseTime.getTime() + timeOffset),
     });
+    timeOffset += 15000;
 
     messages.push({
-      id: "9",
+      id: String(msgId++),
       role: "user",
       content: atendimento.origin_address,
-      timestamp: new Date(baseTime.getTime() + 150000),
+      timestamp: new Date(baseTime.getTime() + timeOffset),
     });
+    timeOffset += 10000;
   }
 
   // Localização de destino
   if (atendimento.destination_address) {
     messages.push({
-      id: "10",
+      id: String(msgId++),
       role: "ai",
-      content: "E para onde o veículo deve ser levado?",
-      timestamp: new Date(baseTime.getTime() + 165000),
+      content: "Agora me envie a localização de destino",
+      timestamp: new Date(baseTime.getTime() + timeOffset),
     });
+    timeOffset += 15000;
 
     messages.push({
-      id: "11",
+      id: String(msgId++),
       role: "user",
       content: atendimento.destination_address,
-      timestamp: new Date(baseTime.getTime() + 195000),
+      timestamp: new Date(baseTime.getTime() + timeOffset),
+    });
+    timeOffset += 10000;
+  }
+
+  // Mensagem final baseada no status
+  if (atendimento.status === "finished" || atendimento.status === "transferred") {
+    messages.push({
+      id: String(msgId++),
+      role: "ai",
+      content: "Perfeito! Seu chamado foi registrado com sucesso. Um prestador será acionado em breve. Obrigado por utilizar nossos serviços!",
+      timestamp: new Date(baseTime.getTime() + timeOffset),
     });
   }
 
-  // Status finalizado
-  if (atendimento.status === "finished" || atendimento.status === "transferred") {
-    messages.push({
-      id: "12",
-      role: "ai",
-      content: "Perfeito! Seu chamado foi registrado com sucesso. Um prestador será acionado em breve. Obrigado por utilizar nossos serviços!",
-      timestamp: new Date(baseTime.getTime() + 210000),
-    });
-  }
+  console.log(`📊 Total de mensagens geradas: ${messages.length}`);
+  console.log('📋 Mensagens:', messages.map(m => `[${m.role}] ${m.content.substring(0, 50)}...`));
 
   return messages;
 }
@@ -150,35 +245,148 @@ function generateMockMessages(atendimento: AssociateService): ChatMessage[] {
 export function ChatModal({ open, onOpenChange, atendimento }: ChatModalProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [displayedMessages, setDisplayedMessages] = useState<ChatMessage[]>([]);
+  const [currentAtendimento, setCurrentAtendimento] = useState<AssociateService | null>(atendimento);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Gera mensagens quando atendimento muda
+  // DEBUG: Log de renderização
+  console.log(`🎨 RENDER #${Date.now()} - displayedMessages: ${displayedMessages.length} itens`,
+    displayedMessages.map(m => `[${m.id}:${m.role}]`).join(', '));
+
+  // Reset ao abrir/fechar modal
   useEffect(() => {
-    if (atendimento) {
-      const mockMessages = generateMockMessages(atendimento);
-      setMessages(mockMessages);
+    if (open) {
+      setIsInitialLoad(true);
       setDisplayedMessages([]);
+    }
+  }, [open]);
+
+  // Função para atualizar atendimento
+  const updateAtendimento = useCallback(async () => {
+    if (!atendimento) return;
+
+    console.log('🔄 updateAtendimento chamado para ID:', atendimento.id);
+    try {
+      const updated = await atendimentosService.getById(String(atendimento.id));
+      setCurrentAtendimento(updated);
+      const newMessages = generateMessagesFromData(updated);
+      console.log(`🔢 Gerando ${newMessages.length} novas mensagens`);
+      setMessages(newMessages);
+    } catch (error) {
+      console.error('Erro ao buscar atendimento:', error);
     }
   }, [atendimento]);
 
+  // Busca inicial ao abrir o modal
+  useEffect(() => {
+    if (open && atendimento) {
+      console.log(`🔍 Carregando conversa do atendimento #${atendimento.id}...`);
+      updateAtendimento();
+    }
+  }, [open, atendimento, updateAtendimento]);
+
+  // Callback estável para o WebSocket
+  const handleAssociateServiceUpdated = useCallback((updatedAtendimento) => {
+    // Só atualiza se for o atendimento que está sendo visualizado
+    if (open && atendimento && updatedAtendimento.id === atendimento.id) {
+      console.log(`📝 Conversa atualizada via WebSocket - Atendimento #${atendimento.id}`);
+      console.log('🔄 Atualizando histórico de mensagens...');
+      updateAtendimento();
+    }
+  }, [open, atendimento, updateAtendimento]);
+
+  // WebSocket: escuta atualizações do atendimento específico em tempo real
+  const { isConnected } = useWebSocket({
+    onAssociateServiceUpdated: handleAssociateServiceUpdated,
+    enabled: open, // Só conecta quando o modal está aberto
+  });
+
   // Efeito de "tempo real" - adiciona mensagens uma a uma
   useEffect(() => {
-    if (!open || messages.length === 0) return;
+    console.log(`🎬 Efeito de exibição #${Date.now()} - open: ${open}, messages: ${messages.length}, isInitialLoad: ${isInitialLoad}, displayed: ${displayedMessages.length}`);
 
-    setDisplayedMessages([]);
-    let index = 0;
+    if (!open || messages.length === 0) {
+      console.log('⏸️ Efeito pausado (modal fechado ou sem mensagens)');
+      return;
+    }
 
-    const interval = setInterval(() => {
-      if (index < messages.length) {
-        setDisplayedMessages((prev) => [...prev, messages[index]]);
-        index++;
-      } else {
-        clearInterval(interval);
-      }
-    }, 800);
+    // Se não há mensagens novas, não faz nada
+    if (messages.length <= displayedMessages.length) {
+      console.log('⏸️ Sem mensagens novas para exibir');
+      return;
+    }
 
-    return () => clearInterval(interval);
-  }, [open, messages]);
+    let isCancelled = false;
+
+    // Se é o carregamento inicial, começa do zero
+    if (isInitialLoad) {
+      console.log(`▶️ Iniciando animação inicial de ${messages.length} mensagens`);
+      setDisplayedMessages([]);
+      let index = 0;
+
+      const showNextMessage = () => {
+        if (isCancelled) {
+          console.log('⛔ Animação cancelada');
+          return;
+        }
+
+        if (index < messages.length) {
+          const currentMessage = messages[index];
+          console.log(`  📨 Exibindo mensagem ${index + 1}/${messages.length}: [${currentMessage.role}] ${currentMessage.content.substring(0, 30)}...`);
+          setDisplayedMessages((prev) => [...prev, currentMessage]);
+          index++;
+
+          // Define o delay para a próxima mensagem
+          if (index < messages.length) {
+            const currentDelay = 1000;
+            setTimeout(showNextMessage, currentDelay);
+          } else {
+            console.log('✅ Animação inicial completa');
+            setIsInitialLoad(false);
+          }
+        }
+      };
+
+      setTimeout(showNextMessage, 0);
+    } else {
+      // Animação de mensagens novas (WebSocket)
+      const newMessagesCount = messages.length - displayedMessages.length;
+      console.log(`➕ Animando ${newMessagesCount} novas mensagens via WebSocket`);
+      let index = displayedMessages.length;
+
+      const showNextMessage = () => {
+        if (isCancelled) {
+          console.log('⛔ Animação de novas mensagens cancelada');
+          return;
+        }
+
+        if (index < messages.length) {
+          const currentMessage = messages[index];
+          console.log(`  📨 Exibindo nova mensagem ${index + 1}/${messages.length}: [${currentMessage.role}] ${currentMessage.content.substring(0, 30)}...`);
+          setDisplayedMessages((prev) => [...prev, currentMessage]);
+          index++;
+
+          // Define o delay para a próxima mensagem
+          if (index < messages.length) {
+            const currentDelay = 1000;
+            setTimeout(showNextMessage, currentDelay);
+          } else {
+            console.log('✅ Novas mensagens exibidas');
+          }
+        }
+      };
+
+      // Aguarda um tempo antes de mostrar a primeira mensagem nova
+      // para dar tempo de exibir o indicador de "digitando"
+      const initialDelay = 1000;
+      setTimeout(showNextMessage, initialDelay);
+    }
+
+    return () => {
+      console.log('🧹 Limpando animação - marcando como cancelada');
+      isCancelled = true;
+    };
+  }, [open, messages, isInitialLoad]); // Removido displayedMessages.length
 
   // Auto-scroll para última mensagem
   useEffect(() => {
@@ -187,10 +395,10 @@ export function ChatModal({ open, onOpenChange, atendimento }: ChatModalProps) {
     }
   }, [displayedMessages]);
 
-  if (!atendimento) return null;
+  if (!currentAtendimento) return null;
 
-  const associateName = atendimento.associate_cars?.associates?.name || "Associado";
-  const associatePhone = atendimento.associate_cars?.associates?.phone || atendimento.phone;
+  const associateName = currentAtendimento.associate_cars?.associates?.name || "Associado";
+  const associatePhone = currentAtendimento.associate_cars?.associates?.phone || currentAtendimento.phone;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -212,13 +420,13 @@ export function ChatModal({ open, onOpenChange, atendimento }: ChatModalProps) {
                 {formatPhone(associatePhone)}
                 <span className="mx-1">•</span>
                 <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                  #{atendimento.id}
+                  #{currentAtendimento.id}
                 </Badge>
               </div>
             </div>
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <Clock className="h-3 w-3" />
-              {formatDateTime(atendimento.created_at)}
+              {formatDateTime(currentAtendimento.created_at)}
             </div>
           </div>
         </DialogHeader>
@@ -226,6 +434,15 @@ export function ChatModal({ open, onOpenChange, atendimento }: ChatModalProps) {
         {/* Área de mensagens */}
         <ScrollArea className="flex-1 px-4" ref={scrollRef}>
           <div className="py-4 space-y-3">
+            {(() => {
+              console.log(`🖼️ Renderizando ${displayedMessages.length} mensagens no DOM`);
+              const ids = displayedMessages.map(m => m.id);
+              const uniqueIds = new Set(ids);
+              if (ids.length !== uniqueIds.size) {
+                console.warn(`⚠️ DUPLICAÇÃO DETECTADA! IDs duplicados:`, ids);
+              }
+              return null;
+            })()}
             {displayedMessages.map((message, index) => (
               <div
                 key={message.id}
@@ -275,37 +492,57 @@ export function ChatModal({ open, onOpenChange, atendimento }: ChatModalProps) {
             ))}
 
             {/* Indicador de digitando - estilo ondas sonoras */}
-            {displayedMessages.length < messages.length && (
-              <div className="flex items-end gap-2 justify-start">
-                <Avatar className="h-7 w-7">
-                  <AvatarFallback className="bg-primary text-primary-foreground">
-                    <Bot className="h-4 w-4" />
-                  </AvatarFallback>
-                </Avatar>
-                <div className="bg-muted px-4 py-3 rounded-2xl rounded-bl-md">
-                  <div className="flex items-center gap-[3px] h-5">
-                    {[...Array(5)].map((_, i) => (
-                      <span
-                        key={i}
-                        className="w-[3px] bg-primary/60 rounded-full animate-sound-wave"
-                        style={{
-                          animationDelay: `${i * 120}ms`,
-                          height: "100%",
-                        }}
-                      />
-                    ))}
+            {displayedMessages.length < messages.length && (() => {
+              const nextMessage = messages[displayedMessages.length];
+              const isAI = nextMessage.role === "ai";
+
+              return (
+                <div className={`flex items-end gap-2 ${isAI ? "justify-start" : "justify-end"}`}>
+                  {isAI && (
+                    <Avatar className="h-7 w-7">
+                      <AvatarFallback className="bg-primary text-primary-foreground">
+                        <Bot className="h-4 w-4" />
+                      </AvatarFallback>
+                    </Avatar>
+                  )}
+                  <div className={`px-4 py-3 rounded-2xl ${
+                    isAI
+                      ? "bg-muted rounded-bl-md"
+                      : "bg-primary/20 rounded-br-md"
+                  }`}>
+                    <div className="flex items-center gap-[3px] h-5">
+                      {[...Array(5)].map((_, i) => (
+                        <span
+                          key={i}
+                          className={`w-[3px] rounded-full animate-sound-wave ${
+                            isAI ? "bg-primary/60" : "bg-primary/80"
+                          }`}
+                          style={{
+                            animationDelay: `${i * 120}ms`,
+                            height: "100%",
+                          }}
+                        />
+                      ))}
+                    </div>
                   </div>
+                  {!isAI && (
+                    <Avatar className="h-7 w-7">
+                      <AvatarFallback className="bg-secondary text-secondary-foreground">
+                        <User className="h-4 w-4" />
+                      </AvatarFallback>
+                    </Avatar>
+                  )}
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
         </ScrollArea>
 
         {/* Footer info */}
         <div className="px-4 py-3 border-t bg-muted/30 flex-shrink-0">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Plataforma: <strong className="capitalize">{atendimento.plataform}</strong></span>
-            <span>Cliente: <strong className="capitalize">{atendimento.association}</strong></span>
+            <span>Plataforma: <strong className="capitalize">{currentAtendimento.plataform}</strong></span>
+            <span>Cliente: <strong className="capitalize">{currentAtendimento.association}</strong></span>
           </div>
         </div>
       </DialogContent>

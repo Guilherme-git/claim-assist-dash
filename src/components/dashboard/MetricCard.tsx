@@ -11,6 +11,7 @@ interface MetricCardProps {
   };
   variant?: "default" | "primary" | "success" | "warning" | "danger" | "info" | "teal";
   delay?: number;
+  compact?: boolean; // Reduz o espaço entre conteúdo e ícone
 }
 
 const variantStyles = {
@@ -33,9 +34,9 @@ const iconBgStyles = {
   teal: "bg-white/20 text-white backdrop-blur-sm",
 };
 
-export function MetricCard({ title, value, icon: Icon, trend, variant = "default", delay = 0 }: MetricCardProps) {
+export function MetricCard({ title, value, icon: Icon, trend, variant = "default", delay = 0, compact = false }: MetricCardProps) {
   return (
-    <div 
+    <div
       className={cn(
         "relative overflow-hidden rounded-2xl p-6 border transition-all duration-500",
         "hover:shadow-xl hover:-translate-y-1 hover:scale-[1.02]",
@@ -48,22 +49,28 @@ export function MetricCard({ title, value, icon: Icon, trend, variant = "default
       {variant !== "default" && (
         <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-black/5" />
       )}
-      
-      <div className="relative flex items-start justify-between">
-        <div className="space-y-3">
+
+      <div className={cn(
+        "relative flex items-start",
+        compact ? "gap-2" : "justify-between"
+      )}>
+        <div className={cn("space-y-3", compact ? "flex-1 min-w-0" : "")}>
           <p className={cn(
             "text-sm font-medium tracking-wide",
             variant === "default" ? "text-muted-foreground" : "text-white/80"
           )}>
             {title}
           </p>
-          <p className="text-4xl font-bold tracking-tight">{value}</p>
+          <p className={cn(
+            "font-bold tracking-tight",
+            compact ? "text-3xl" : "text-4xl"
+          )}>{value}</p>
           {trend && (
             <div className={cn(
               "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold",
-              variant === "default" 
-                ? trend.isPositive 
-                  ? "bg-success/10 text-success" 
+              variant === "default"
+                ? trend.isPositive
+                  ? "bg-success/10 text-success"
                   : "bg-destructive/10 text-destructive"
                 : "bg-white/20 text-white backdrop-blur-sm"
             )}>
@@ -73,10 +80,11 @@ export function MetricCard({ title, value, icon: Icon, trend, variant = "default
           )}
         </div>
         <div className={cn(
-          "p-4 rounded-2xl transition-transform duration-300 group-hover:scale-110",
+          "rounded-2xl transition-transform duration-300 group-hover:scale-110 flex-shrink-0",
+          "p-3",
           iconBgStyles[variant]
         )}>
-          <Icon className="h-7 w-7" strokeWidth={1.5} />
+          <Icon className="h-6 w-6" strokeWidth={1.5} />
         </div>
       </div>
     </div>

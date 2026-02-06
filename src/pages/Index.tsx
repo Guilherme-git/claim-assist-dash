@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Headphones, PhoneCall, CheckCircle, Clock, Loader2, Truck, DollarSign, Receipt, CreditCard, CheckCircle2, AlertCircle } from "lucide-react";
+import { Headphones, PhoneCall, CheckCircle, Clock, Loader2, Truck, DollarSign, Receipt, CreditCard, CheckCircle2, AlertCircle, Star, Activity } from "lucide-react";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { Header } from "@/components/dashboard/Header";
 import { MetricCard } from "@/components/dashboard/MetricCard";
@@ -97,21 +97,21 @@ const Index = () => {
           {/* Metrics Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <MetricCard
-              title="Chamados Hoje - Chamados"
+              title="Chamados Hoje"
               value={dashboardData.attendancesToday.toString()}
               icon={Headphones}
               variant="primary"
               delay={0}
             />
             <MetricCard
-              title="Em Andamento - Chamados"
+              title="Em Andamento"
               value={dashboardData.attendancesInProgress.toString()}
               icon={PhoneCall}
               variant="warning"
               delay={100}
             />
             <MetricCard
-              title="Finalizados - Chamados"
+              title="Finalizados"
               value={dashboardData.attendancesFinished.toString()}
               icon={CheckCircle}
               variant="success"
@@ -120,60 +120,65 @@ const Index = () => {
           </div>
 
           {/* Main Content */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <MetricCard
-                  title="Atrasos - Chamados"
-                  value={dashboardData.attendancesDelayed?.toString() || "0"}
-                  icon={AlertCircle}
-                  variant="danger"
-                  delay={350}
-                />
-                <MetricCard
-                  title="Tempo Médio de Execução de Guincho - Chamados"
-                  value={dashboardData.averageTowingExecutionTime || "0min"}
-                  icon={Truck}
-                  variant="info"
-                  delay={400}
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <MetricCard
-                  title="Ticket Médio - Chamados"
-                  value={dashboardData.towingTicket?.averageTicket || "R$ 0,00"}
-                  icon={DollarSign}
-                  variant="teal"
-                  delay={300}
-                />
-                <MetricCard
-                  title="Receita Total - Chamados"
-                  value={dashboardData.towingTicket?.totalRevenue || "R$ 0,00"}
-                  icon={CreditCard}
-                  variant="success"
-                  delay={400}
-                />
-                <MetricCard
-                  title="Boletos Pagos - Chamados"
-                  value={dashboardData.towingTicket?.paidBillsCount?.toString() || "0"}
-                  icon={Receipt}
-                  variant="danger"
-                  delay={500}
-                />
-              </div>
-            </div>
-            <div className="flex flex-col gap-6">
-              <QuickStats
-                averageServiceTime={dashboardData.averageServiceTime || "0min"}
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <MetricCard
+                title="Média NPS"
+                value={dashboardData.averageNPS || "0/5.0"}
+                icon={Star}
+                variant="warning"
+                delay={350}
               />
               <MetricCard
-                title="Taxa de Resolução - Chamados"
+                title="Tempo Médio de Execução"
+                value={dashboardData.averageTowingExecutionTime || "0min"}
+                icon={Truck}
+                variant="info"
+                delay={400}
+              />
+              <MetricCard
+                title="Ticket Médio"
+                value={dashboardData.towingTicket?.averageTicket || "R$ 0,00"}
+                icon={DollarSign}
+                variant="teal"
+                delay={450}
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <MetricCard
+                title="Despesa Total"
+                value={dashboardData.towingTicket?.totalExpense || "R$ 0,00"}
+                icon={CreditCard}
+                variant="success"
+                delay={500}
+                compact={true}
+              />
+              <MetricCard
+                title="Taxa de Resolução"
                 value={dashboardData.quickStats?.resolutionRate || "0%"}
                 icon={CheckCircle2}
                 variant="primary"
+                delay={550}
+              />
+              <MetricCard
+                title="Atrasos"
+                value={dashboardData.attendancesDelayed?.toString() || "0"}
+                icon={AlertCircle}
+                variant="danger"
                 delay={600}
               />
+              <MetricCard
+                title="Frequência de Acionamento"
+                value={dashboardData.callFrequency || "0%"}
+                icon={Activity}
+                variant="info"
+                delay={650}
+                compact={true}
+              />
             </div>
+            <QuickStats
+              averageServiceTime={dashboardData.averageServiceTime || "0min"}
+            />
           </div>
         </div>
       </main>

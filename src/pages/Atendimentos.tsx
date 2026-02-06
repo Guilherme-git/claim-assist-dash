@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useWebSocket } from "@/hooks/useWebSocket";
 import {
   Table,
   TableBody,
@@ -100,6 +101,41 @@ export default function Atendimentos() {
   const [selectedAtendimento, setSelectedAtendimento] = useState<AssociateService | null>(null);
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
 
+  // Função para recarregar atendimentos
+  const reloadAtendimentos = useCallback(async () => {
+    try {
+      const response = await atendimentosService.getAll({
+        page: currentPage,
+        status: statusFilter !== "todos" ? statusFilter : undefined,
+        request_reason: tipoFilter !== "todos" ? tipoFilter : undefined,
+        plataform: plataformFilter !== "todos" ? plataformFilter : undefined,
+        search: debouncedSearch.trim() || undefined,
+      });
+      setAtendimentos(response.data);
+      setPagination(response.pagination);
+    } catch (err) {
+      console.error('Erro ao recarregar atendimentos:', err);
+    }
+  }, [currentPage, statusFilter, tipoFilter, plataformFilter, debouncedSearch]);
+
+  // Callbacks estáveis para o WebSocket
+  const handleAssociateServiceCreated = useCallback((newAtendimento) => {
+    console.log('🆕 Novo atendimento criado, recarregando lista...');
+    reloadAtendimentos();
+  }, [reloadAtendimentos]);
+
+  const handleAssociateServiceUpdated = useCallback((updatedAtendimento) => {
+    console.log('📝 Atendimento atualizado, recarregando lista...');
+    reloadAtendimentos();
+  }, [reloadAtendimentos]);
+
+  // WebSocket: escuta eventos em tempo real
+  const { isConnected } = useWebSocket({
+    onAssociateServiceCreated: handleAssociateServiceCreated,
+    onAssociateServiceUpdated: handleAssociateServiceUpdated,
+    enabled: true,
+  });
+
   // Debounce da busca para não chamar a API a cada tecla
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(searchTerm), 400);
@@ -143,6 +179,20 @@ export default function Atendimentos() {
 
   return (
     <DashboardLayout title="Atendimentos" subtitle="Gerencie todos os atendimentos em tempo real">
+      {/* Indicador de WebSocket */}
+      <div className="mb-4 flex items-center gap-2 text-sm">
+        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${
+          isConnected ? 'bg-green-500/10 text-green-600' : 'bg-gray-500/10 text-gray-600'
+        }`}>
+          <div className={`h-2 w-2 rounded-full ${
+            isConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
+          }`} />
+          <span className="text-xs font-medium">
+            {isConnected ? 'WebSocket Conectado' : 'WebSocket Desconectado'}
+          </span>
+        </div>
+      </div>
+
       {/* Barra de Busca */}
       <div className="mb-4">
         <div className="relative">

@@ -5404,3 +5404,2154 @@ Map → Renderiza cards na ordem fixa
 
 ---
 
+
+---
+
+## 🔌 WebSocket - Atualização em Tempo Real
+
+### **Visão Geral**
+
+A aplicação utiliza WebSocket (Socket.IO) para receber eventos em tempo real da API, mantendo os dados sempre atualizados sem necessidade de recarregar a página.
+
+### **Arquitetura**
+
+```
+[API Utiliza - Laravel] → Observer detecta mudanças no banco
+                ↓
+        Emite eventos via WebSocket
+                ↓
+[Frontend React] → Hook useWebSocket escuta eventos
+                ↓
+        Atualiza interface automaticamente
+```
+
+### **Configuração**
+
+#### **1. Dependência Instalada**
+```bash
+npm install socket.io-client
+```
+
+#### **2. Hook Customizado: `useWebSocket`**
+
+Localização: `src/hooks/useWebSocket.ts`
+
+**Funcionalidades:**
+- Conecta automaticamente ao servidor WebSocket
+- Reconecta automaticamente em caso de desconexão
+- Escuta eventos específicos (`associate_service:created`, `associate_service:updated`)
+- Permite callbacks para processar eventos
+
+**Parâmetros:**
+```typescript
+interface UseWebSocketOptions {
+  onAssociateServiceCreated?: (data: AssociateService) => void;
+  onAssociateServiceUpdated?: (data: AssociateService) => void;
+  enabled?: boolean;
+}
+```
+
+**Retorno:**
+```typescript
+{
+  isConnected: boolean,  // Estado da conexão
+  socket: Socket | null  // Instância do socket
+}
+```
+
+### **Eventos Escutados**
+
+#### **1. `associate_service:created`**
+Disparado quando um novo atendimento é criado no banco de dados.
+
+**Payload:**
+```typescript
+{
+  timestamp: string,
+  event: "associate_service:created",
+  data: AssociateService
+}
+```
+
+**Ação:** Recarrega a lista de atendimentos na tela principal.
+
+#### **2. `associate_service:updated`**
+Disparado quando um atendimento existente é atualizado.
+
+**Payload:**
+```typescript
+{
+  timestamp: string,
+  event: "associate_service:updated",
+  data: AssociateService
+}
+```
+
+**Ação:** 
+- Recarrega a lista de atendimentos
+- Se o ChatModal estiver aberto para esse atendimento, atualiza as mensagens
+
+### **Integração nas Telas**
+
+#### **Tela de Atendimentos** (`src/pages/Atendimentos.tsx`)
+
+```typescript
+const { isConnected } = useWebSocket({
+  onAssociateServiceCreated: (newAtendimento) => {
+    console.log('🆕 Novo atendimento criado, recarregando lista...');
+    reloadAtendimentos();
+  },
+  onAssociateServiceUpdated: (updatedAtendimento) => {
+    console.log('📝 Atendimento atualizado, recarregando lista...');
+    reloadAtendimentos();
+  },
+  enabled: true,
+});
+```
+
+**Indicador Visual:**
+- Mostra status da conexão WebSocket (verde = conectado, cinza = desconectado)
+- Animação de pulso quando conectado
+
+#### **ChatModal** (`src/components/atendimentos/ChatModal.tsx`)
+
+```typescript
+useWebSocket({
+  onAssociateServiceUpdated: (updatedAtendimento) => {
+    // Só atualiza se for o atendimento que está sendo visualizado
+    if (open && atendimento && updatedAtendimento.id === atendimento.id) {
+      console.log('📝 Atendimento do modal atualizado via WebSocket');
+      updateAtendimento();
+    }
+  },
+  enabled: open, // Só conecta quando o modal está aberto
+});
+```
+
+**Comportamento:**
+- Conexão ativada apenas quando o modal está aberto
+- Atualiza mensagens em tempo real quando o atendimento é modificado
+- Combina polling (5s) + WebSocket para máxima confiabilidade
+
+### **Configuração do Servidor**
+
+**URL do WebSocket:**
+Definida na variável de ambiente `VITE_API_URL` (padrão: `http://localhost:3001`)
+
+**Opções de Transporte:**
+```typescript
+{
+  transports: ['websocket', 'polling'],
+  reconnection: true,
+  reconnectionDelay: 1000,
+  reconnectionAttempts: 10,
+}
+```
+
+### **Logs do Console**
+
+**Conexão bem-sucedida:**
+```
+🔌 Conectando ao WebSocket em http://localhost:3001
+✅ Conectado ao WebSocket. ID: abc123def
+```
+
+**Evento recebido:**
+```
+📥 NOVO ATENDIMENTO RECEBIDO VIA WEBSOCKET!
+═══════════════════════════════════════
+Timestamp: 2026-02-05T18:00:00.123Z
+ID do Atendimento: 2903
+Status: waiting_identification
+Associação: solidy
+Telefone: 11987654321
+═══════════════════════════════════════
+```
+
+**Erro de conexão:**
+```
+❌ Erro de conexão WebSocket: Connection refused
+🔄 Tentando reconectar... (tentativa 1)
+```
+
+### **Benefícios**
+
+✅ **Atualização Instantânea:** Novos atendimentos aparecem automaticamente sem recarregar  
+✅ **Escalabilidade:** Suporta múltiplas conexões simultâneas  
+✅ **Resiliência:** Reconexão automática em caso de falha  
+✅ **Performance:** Reduz carga no servidor (menos requisições HTTP)  
+✅ **UX Aprimorada:** Interface sempre sincronizada com o banco de dados
+
+### **Fallback (Redundância)**
+
+Mesmo com WebSocket ativo, o ChatModal mantém:
+- **Polling de 5 segundos:** Garante atualização mesmo se WebSocket falhar
+- **Dupla camada de confiabilidade:** WebSocket (instantâneo) + Polling (backup)
+
+### **Troubleshooting**
+
+**WebSocket não conecta:**
+1. Verificar se a API está rodando em `http://localhost:3001`
+2. Verificar se o servidor Socket.IO está configurado corretamente
+3. Verificar configuração de CORS no backend
+
+**Eventos não são recebidos:**
+1. Verificar se o Observer está ativo no Laravel
+2. Verificar logs do servidor para confirmar emissão de eventos
+3. Verificar se os nomes dos eventos estão corretos (`associate_service:created`, `associate_service:updated`)
+
+**Reconexões frequentes:**
+1. Verificar estabilidade da rede
+2. Aumentar `reconnectionDelay` se necessário
+3. Verificar timeout do servidor WebSocket
+
+
+---
+
+## 🔄 Atualização: ChatModal com WebSocket em Tempo Real
+
+### **Mudanças Implementadas**
+
+#### **1. Remoção do Polling**
+- ❌ Removido polling de 5 segundos do ChatModal
+- ✅ Substituído por WebSocket para atualizações em tempo real
+- 📊 Redução significativa de requisições HTTP ao servidor
+
+#### **2. Escuta WebSocket Ativa**
+Quando o usuário clica em "Ver Mensagem" na listagem de atendimentos:
+
+```typescript
+// Carregamento inicial ao abrir
+useEffect(() => {
+  if (open && atendimento) {
+    console.log(`🔍 Carregando conversa do atendimento #${atendimento.id}...`);
+    updateAtendimento();
+  }
+}, [open, atendimento, updateAtendimento]);
+
+// WebSocket ativo apenas quando modal está aberto
+const { isConnected } = useWebSocket({
+  onAssociateServiceUpdated: (updatedAtendimento) => {
+    if (open && atendimento && updatedAtendimento.id === atendimento.id) {
+      console.log(`📝 Conversa atualizada via WebSocket - Atendimento #${atendimento.id}`);
+      updateAtendimento();
+    }
+  },
+  enabled: open, // Conexão ativa SOMENTE quando modal aberto
+});
+```
+
+#### **3. Indicador Visual "Ao Vivo"**
+- Badge no header do modal mostrando status da conexão
+- **Verde com pulso**: WebSocket conectado, escutando atualizações em tempo real
+- **Cinza**: Offline ou desconectado
+
+### **Fluxo de Funcionamento**
+
+```
+1. Usuário clica em "Ver Mensagem"
+        ↓
+2. Modal abre e carrega conversa atual
+        ↓
+3. WebSocket conecta e começa a escutar
+        ↓
+4. API atualiza o atendimento (novo status, nova mensagem no service_form)
+        ↓
+5. WebSocket emite evento "associate_service:updated"
+        ↓
+6. ChatModal recebe evento e verifica se é o atendimento correto
+        ↓
+7. Busca dados atualizados via API
+        ↓
+8. Atualiza mensagens na tela INSTANTANEAMENTE
+```
+
+### **Logs no Console**
+
+**Ao abrir o modal:**
+```
+🔍 Carregando conversa do atendimento #2903...
+🔌 Conectando ao WebSocket em http://localhost:3001
+✅ Conectado ao WebSocket. ID: xyz789
+```
+
+**Ao receber atualização:**
+```
+📝 Conversa atualizada via WebSocket - Atendimento #2903
+🔄 Atualizando histórico de mensagens...
+```
+
+**Ao fechar o modal:**
+```
+👋 Desconectando WebSocket...
+```
+
+### **Benefícios**
+
+✅ **Atualização Instantânea:** Histórico de conversa atualiza em milissegundos  
+✅ **Eficiência:** Sem requisições desnecessárias (eliminou polling)  
+✅ **Escalável:** Suporta múltiplos usuários visualizando diferentes atendimentos  
+✅ **Feedback Visual:** Usuário sabe que está "ao vivo"  
+✅ **Economia de Recursos:** ~92% menos requisições (1 inicial vs 12 por minuto com polling)
+
+### **Comportamento Específico**
+
+- WebSocket conecta **apenas** quando o modal está aberto
+- Desconecta automaticamente ao fechar o modal
+- Atualiza **apenas** se o evento for do atendimento sendo visualizado
+- Mantém histórico completo sem reiniciar animações
+
+### **Comparação: Antes vs Depois**
+
+| Aspecto | Antes (Polling) | Depois (WebSocket) |
+|---------|----------------|-------------------|
+| Requisições/min | ~12 (a cada 5s) | 1 (ao abrir) |
+| Latência atualização | Até 5 segundos | < 100ms |
+| Carga no servidor | Alta | Mínima |
+| Experiência do usuário | Boa | Excelente |
+| Feedback visual | Nenhum | Badge "Ao vivo" |
+
+
+---
+
+## 💬 ChatModal - Sistema de Mensagens e Animação
+
+### **Visão Geral**
+
+O ChatModal exibe a conversa entre a IA e o associado de forma animada, simulando uma experiência de chat em tempo real. As mensagens são geradas dinamicamente com base nos dados do atendimento e aparecem progressivamente com indicador de "digitando".
+
+Localização: `src/components/atendimentos/ChatModal.tsx`
+
+### **Fluxo de Conversação**
+
+A conversa segue uma sequência estruturada baseada nos dados disponíveis:
+
+#### **1. Saudação Inicial (Sempre)**
+```
+IA: "Olá! Sou a assistente virtual da Utiliza. Como posso ajudá-lo hoje?"
+```
+
+#### **2. Solicitação da Placa (Sempre)**
+```
+IA: "Então DIGITE SOMENTE A PLACA do veículo para darmos continuidade ao atendimento. 👇🏼"
+Usuário: [placa do veículo] (de associate_cars.plate)
+```
+
+#### **3. Motivo do Contato (Se request_reason preenchido)**
+```
+IA: "Qual o motivo do contato?"
+Usuário: [motivo traduzido] (de request_reason usando reasonLabels)
+IA: "Entendido. Preciso fazer algumas perguntas para direcionar melhor o atendimento."
+```
+
+**Condição:** `if (atendimento.request_reason)`
+
+**Exemplo:**
+```
+IA: "Qual o motivo do contato?"
+Usuário: "Pneu Furado"  (flat_tire → traduzido)
+IA: "Entendido. Preciso fazer algumas perguntas para direcionar melhor o atendimento."
+```
+
+#### **4. Questionário - service_form (Se preenchido)**
+Para cada campo preenchido no service_form:
+```
+IA: [Pergunta do serviceFormLabels]
+Usuário: [Resposta do campo]
+```
+
+Exemplo:
+```
+IA: "Possui carga ou peso? → Se sim, qual tipo e quantidade?"
+Usuário: "Sim, ferramentas"
+IA: "O que aconteceu com o veículo (descreva o que está ocorrendo)?"
+Usuário: "Motor não liga"
+```
+
+#### **5. Localização de Origem (Se origin_address preenchido)**
+```
+IA: "Por gentileza, me envie sua localização atual"
+Usuário: [Endereço de origem]
+```
+
+#### **6. Localização de Destino (Se destination_address preenchido)**
+```
+IA: "Agora me envie a localização de destino"
+Usuário: [Endereço de destino]
+```
+
+#### **7. Mensagem Final (Se status = finished ou transferred)**
+```
+IA: "Perfeito! Seu chamado foi registrado com sucesso. Um prestador será acionado em breve. Obrigado por utilizar nossos serviços!"
+```
+
+**Condição:** `if (atendimento.status === "finished" || atendimento.status === "transferred")`
+
+**Código:**
+```typescript
+// Mensagem final baseada no status
+if (atendimento.status === "finished" || atendimento.status === "transferred") {
+  messages.push({
+    id: String(msgId++),
+    role: "ai",
+    content: "Perfeito! Seu chamado foi registrado com sucesso. Um prestador será acionado em breve. Obrigado por utilizar nossos serviços!",
+    timestamp: new Date(baseTime.getTime() + timeOffset),
+  });
+}
+```
+
+**Status que exibem a mensagem:**
+- ✅ `"finished"` - Atendimento finalizado
+- ✅ `"transferred"` - Atendimento transferido para operadora
+
+### **Mapeamentos de Labels**
+
+#### **Tipos de Motivo (request_reason)**
+```typescript
+const reasonLabels: Record<string, string> = {
+  collision: "Colisão",
+  fire: "Incêndio",
+  natural_events: "Eventos Naturais",
+  breakdown_by_mechanical_failure_or_electric: "Pane Mecânica ou Elétrica",
+  flat_tire: "Pneu Furado",
+  battery_failure: "Falha na Bateria",
+  locked_vehicle: "Veículo Trancado",
+  empty_tank: "Tanque Vazio",
+  theft_or_robbery: "Furto ou Roubo",
+};
+```
+
+#### **Perguntas do Questionário (serviceFormLabels)**
+```typescript
+const serviceFormLabels: Record<string, string> = {
+  vehicle_is_at_collision_scene: "O veículo está no local da colisão?",
+  vehicle_is_moving: "O veículo está circulando (consegue se mover)?",
+  is_to_activate_protection: "Deseja acionar a proteção para sinistro?",
+  any_wheel_is_locked: "Alguma roda do veículo está travada?",
+  vehicle_is_lowered: "Veículo possui alguma dessas características: baixo, rebaixado?",
+  vehicle_is_easily_accessible: "Acesso fácil para remoção (o guincho consegue chegar ao local com facilidade)?",
+  vehicle_cargo: "Possui carga ou peso? → Se sim, qual tipo e quantidade?",
+  number_of_passengers: "Quantos passageiros possui?",
+  associate_items: "Existem objetos no veículo? → Se sim, quais itens?",
+  documents_and_key_are_in_scene: "Documentos e chaves estão no local?",
+  uber_will_be_necessary: "Vai precisar de táxi/Uber?",
+  vehicle_symptom: "O que aconteceu com o veículo (descreva o que está ocorrendo)?",
+  fuel_request: "Combustível desejado:",
+  fuel_price: "Valor de combustível a ser entregue",
+  fuel_payment_type: "Forma de pagamento:",
+  tire_change_quantity: "Quantos pneus precisam ser trocados?",
+  tire_change_associate_has_tools: "Possui ferramenta pra troca?",
+  tire_change_associate_has_spare_tire: "Possui estepe?",
+  battery_charge_resolution: "Apenas a recarga de bateria já resolveria?",
+  locksmith_key_is_inside_vehicle: "A chave está dentro do veículo?",
+  locksmith_all_doors_locked: "O veículo está com todas as portas trancadas?",
+  accessible_vehicle: "O veículo está de fácil acesso?",
+};
+```
+
+### **Processamento do service_form**
+
+O sistema suporta dois formatos de service_form:
+
+#### **Formato 1: Objeto Aninhado (com payload)**
+```json
+{
+  "payload": {
+    "vehicle_cargo": "Sim, ferramentas",
+    "vehicle_symptom": "Motor não liga",
+    "any_wheel_is_locked": "Não"
+  },
+  "flow_token": "abc123"
+}
+```
+
+#### **Formato 2: Objeto Plano**
+```json
+{
+  "vehicle_cargo": "Sim, ferramentas",
+  "vehicle_symptom": "Motor não liga",
+  "any_wheel_is_locked": "Não",
+  "flow_token": "abc123"
+}
+```
+
+Ambos os formatos são processados corretamente. O campo `flow_token` é ignorado na exibição.
+
+### **Sistema de Animação**
+
+#### **Delays entre Mensagens**
+- **Todas as mensagens**: 1 segundo de intervalo
+- **Carregamento inicial**: Começa do zero com animação
+- **Mensagens novas (WebSocket)**: Adiciona apenas as novas com animação
+
+#### **Indicador de "Digitando"**
+
+Aparece antes de cada mensagem durante o período de delay, mostrando:
+- **Avatar da IA** (bot icon) ou **Avatar do Usuário** (user icon)
+- **5 barras animadas** simulando ondas sonoras
+- **Posicionamento**: À esquerda (IA) ou à direita (Usuário)
+
+```typescript
+// Durante o delay de 1 segundo antes de cada mensagem
+<div className="flex items-center gap-2">
+  {isAI ? <Bot icon /> : <User icon />}
+  <div className="px-4 py-3 rounded-2xl">
+    <div className="flex items-center gap-[3px] h-5">
+      {[...Array(5)].map((_, i) => (
+        <span className="w-[3px] rounded-full animate-sound-wave"
+              style={{ animationDelay: `${i * 120}ms` }} />
+      ))}
+    </div>
+  </div>
+  {!isAI && <User icon />}
+</div>
+```
+
+#### **Fluxo de Animação**
+
+**Carregamento Inicial (isInitialLoad = true):**
+```
+1. Modal abre
+2. Busca dados do atendimento
+3. Gera array de mensagens
+4. displayedMessages = []
+5. Para cada mensagem:
+   a. Mostra indicador de digitando (1s)
+   b. Adiciona mensagem ao displayedMessages
+   c. Próxima mensagem
+6. isInitialLoad = false
+```
+
+**Mensagens Novas via WebSocket (isInitialLoad = false):**
+```
+1. WebSocket recebe evento "associate_service:updated"
+2. Busca dados atualizados
+3. Gera novo array de mensagens (maior que o anterior)
+4. Detecta diferença: messages.length > displayedMessages.length
+5. Para cada mensagem nova:
+   a. Mostra indicador de digitando (1s)
+   b. Adiciona mensagem ao displayedMessages
+   c. Próxima mensagem nova
+```
+
+### **Integração com WebSocket**
+
+Quando o modal está aberto e recebe atualizações:
+
+```typescript
+const handleAssociateServiceUpdated = useCallback((updatedAtendimento) => {
+  if (open && atendimento && updatedAtendimento.id === atendimento.id) {
+    console.log(`📝 Conversa atualizada via WebSocket - Atendimento #${atendimento.id}`);
+    updateAtendimento(); // Busca dados atualizados e regenera mensagens
+  }
+}, [open, atendimento, updateAtendimento]);
+
+useWebSocket({
+  onAssociateServiceUpdated: handleAssociateServiceUpdated,
+  enabled: open, // Só conecta quando modal está aberto
+});
+```
+
+**Comportamento:**
+- ✅ Novas mensagens aparecem com animação de 1 segundo
+- ✅ Mensagens antigas permanecem visíveis
+- ✅ Indicador de "digitando" aparece antes de cada nova mensagem
+- ✅ Auto-scroll para a última mensagem
+- ✅ Não reinicia a conversa do zero
+
+### **Exemplo de Conversa Completa**
+
+```
+[21:00] IA: Olá! Sou a assistente virtual da Utiliza. Como posso ajudá-lo hoje?
+[21:00] IA: Então DIGITE SOMENTE A PLACA do veículo para darmos continuidade ao atendimento. 👇🏼
+[21:00] Usuário: PRN8I07
+[21:00] Usuário: Preciso de assistência
+[21:00] IA: Entendi! Para dar continuidade ao atendimento, preciso confirmar alguns dados. Qual o CPF do titular?
+[21:01] Usuário: 123.456.789-00
+[21:01] IA: Perfeito! Encontrei seu cadastro, João Silva. Motivo da Solicitação?
+[21:01] Usuário: Pane Mecânica ou Elétrica
+[21:01] IA: Entendido. Preciso fazer algumas perguntas para direcionar melhor o atendimento.
+[21:01] IA: Possui carga ou peso? → Se sim, qual tipo e quantidade?
+[21:01] Usuário: Sim, ferramentas
+[21:02] IA: O que aconteceu com o veículo (descreva o que está ocorrendo)?
+[21:02] Usuário: Motor não liga
+[21:02] IA: Alguma roda do veículo está travada?
+[21:02] Usuário: Não
+[21:02] IA: Por gentileza, me envie sua localização atual
+[21:03] Usuário: Rua das Flores, 123 - São Paulo, SP
+[21:03] IA: Agora me envie a localização de destino
+[21:03] Usuário: Avenida Paulista, 1000 - São Paulo, SP
+[21:03] IA: Perfeito! Seu chamado foi registrado com sucesso. Um prestador será acionado em breve. Obrigado por utilizar nossos serviços!
+```
+
+### **Logs de Debug**
+
+**Geração de Mensagens:**
+```
+🔍 DEBUG - service_form RAW: { vehicle_cargo: "Sim, ferramentas", ... }
+📦 service_form formato plano: { vehicle_cargo: "Sim, ferramentas", ... }
+✅ serviceFormPayload final: { vehicle_cargo: "Sim, ferramentas", ... }
+📝 Processando 3 campos do service_form
+  - Campo: vehicle_cargo = Sim, ferramentas
+  - Campo: vehicle_symptom = Motor não liga
+  - Campo: any_wheel_is_locked = Não
+📊 Total de mensagens geradas: 15
+```
+
+**Animação:**
+```
+🎬 Efeito de exibição - open: true, messages: 15, isInitialLoad: true, displayed: 0
+▶️ Iniciando animação inicial de 15 mensagens
+  📨 Exibindo mensagem 1/15: [ai] Olá! Sou a assistente virtual da Utiliza...
+  📨 Exibindo mensagem 2/15: [ai] Então DIGITE SOMENTE A PLACA do veículo...
+  📨 Exibindo mensagem 3/15: [user] PRN8I07
+  ...
+✅ Animação inicial completa
+```
+
+**WebSocket - Novas Mensagens:**
+```
+📝 Conversa atualizada via WebSocket - Atendimento #2903
+🔄 Atualizando histórico de mensagens...
+🔢 Gerando 17 novas mensagens
+➕ Animando 2 novas mensagens via WebSocket
+  📨 Exibindo nova mensagem 16/17: [ai] Agora me envie a localização de destino
+  📨 Exibindo nova mensagem 17/17: [user] Avenida Paulista, 1000...
+✅ Novas mensagens exibidas
+```
+
+### **Performance e Otimizações**
+
+✅ **useCallback**: Callbacks estáveis evitam reconexões desnecessárias do WebSocket
+✅ **useRef**: Armazena callbacks sem causar re-renders
+✅ **useEffect com dependências mínimas**: Evita loops infinitos de animação
+✅ **Cancelamento de animações**: Cleanup adequado ao desmontar componente
+✅ **Auto-scroll inteligente**: Scroll suave para última mensagem
+✅ **Animação progressiva**: Apenas novas mensagens são animadas, não toda a conversa
+
+### **Troubleshooting**
+
+**Mensagens aparecem todas de uma vez:**
+- Verificar se os delays estão configurados (1000ms)
+- Verificar logs do console para ver se a animação está sendo executada
+
+**Indicador de digitando não aparece:**
+- Verificar se `displayedMessages.length < messages.length`
+- Verificar se o delay inicial está correto (1000ms)
+
+**Animação reinicia do zero ao receber WebSocket:**
+- Verificar se `isInitialLoad` está sendo setado para `false` após primeira animação
+- Verificar se o código está detectando corretamente mensagens novas
+
+**Mensagens duplicadas:**
+- Verificar se há múltiplas instâncias do ChatModal renderizando
+- Verificar logs para confirmar quantas mensagens estão sendo geradas
+
+
+---
+
+## 🔄 Transferência de Chamados e Vinculação de Atendentes
+
+### **Visão Geral**
+
+O sistema permite transferir chamados entre atendentes e vincula automaticamente o usuário logado ao criar um novo chamado.
+
+Localização:
+- `src/pages/Chamados.tsx` - Listagem com coluna de atendente e menu de transferência
+- `src/components/chamados/TransferCallModal.tsx` - Modal de transferência
+- `src/components/chamados/chamadoFormModal.tsx` - Modal de criação com vinculação automática
+- `src/services/calls.service.ts` - Métodos de API
+
+### **Funcionalidades**
+
+#### **1. Vinculação Automática ao Criar Chamado**
+
+Quando um usuário logado cria um novo chamado, o sistema automaticamente vincula o atendente:
+
+```typescript
+// Pega o usuário logado do localStorage
+const userStr = localStorage.getItem('user');
+const user = userStr ? JSON.parse(userStr) : null;
+
+const payload = {
+  associate_car_id: parseInt(data.associate_vehicle_id),
+  address: data.address,
+  association: data.association,
+  towing_service_type: data.towing_service_type,
+  // ... outros campos
+  user_id: user?.id ? parseInt(user.id) : undefined,
+};
+
+await callsService.createTowingCall(payload);
+```
+
+**Fluxo:**
+1. Usuário faz login → `user` com `id` salvo no localStorage
+2. Usuário clica em "Novo Chamado"
+3. Preenche o formulário e cria o chamado
+4. Sistema pega automaticamente o `user_id` do localStorage
+5. API vincula o chamado ao atendente
+6. Chamado aparece na listagem com o atendente vinculado
+
+#### **2. Coluna de Atendente na Listagem**
+
+A tabela de chamados exibe o atendente vinculado a cada chamado:
+
+```tsx
+<TableCell>
+  <div className="flex items-center gap-2">
+    {chamado.users ? (
+      <>
+        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+          <span className="text-xs font-semibold text-primary">
+            {chamado.users.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()}
+          </span>
+        </div>
+        <div>
+          <p className="font-medium text-sm">{chamado.users.name}</p>
+          <p className="text-xs text-muted-foreground">{chamado.users.email}</p>
+        </div>
+      </>
+    ) : (
+      <span className="text-sm text-muted-foreground">Não atribuído</span>
+    )}
+  </div>
+</TableCell>
+```
+
+**Elementos:**
+- Avatar circular com iniciais do atendente
+- Nome do atendente
+- Email do atendente
+- "Não atribuído" quando não há atendente vinculado
+
+#### **3. Transferência de Chamados**
+
+Permite transferir um chamado de um atendente para outro através do menu de ações:
+
+**Menu de Ações (3 pontinhos):**
+```tsx
+<DropdownMenuItem
+  className="cursor-pointer"
+  onClick={(e) => {
+    e.stopPropagation();
+    setSelectedCallForTransfer(chamado);
+    setIsTransferModalOpen(true);
+  }}
+>
+  <ArrowRightLeft className="h-4 w-4 mr-2" />
+  Transferir Atendente
+</DropdownMenuItem>
+```
+
+**Modal de Transferência:**
+- Exibe informações do chamado (ID, associado, atendente atual)
+- Busca de usuários com debounce (500ms)
+- Mínimo 2 caracteres para iniciar busca
+- Lista de usuários com avatar, nome e email
+- Seleção de usuário desejado
+- Confirmação da transferência
+
+### **Endpoints Utilizados**
+
+#### **Listar Usuários**
+```
+GET /api/users?limit=50&search=nome_ou_email
+```
+
+**Parâmetros:**
+- `limit` (number): Quantidade máxima de resultados (padrão: 50)
+- `search` (string): Busca por nome ou email (mínimo 2 caracteres)
+
+**Resposta:**
+```json
+{
+  "data": [
+    {
+      "id": "131",
+      "name": "Barbara Terianne Couto",
+      "email": "barbara.terianne.c@gmail.com",
+      "email_verified_at": null,
+      "created_at": "2025-11-14T15:59:53.000Z",
+      "updated_at": "2025-12-16T08:46:54.000Z"
+    }
+  ],
+  "pagination": {
+    "total": 1,
+    "current_page": 1,
+    "per_page": 50,
+    "last_page": 1,
+    "from": 1,
+    "to": 1
+  }
+}
+```
+
+#### **Transferir Chamado**
+```
+PATCH /api/calls/guinchos/{id}/transfer
+```
+
+**Body:**
+```json
+{
+  "user_id": 136
+}
+```
+
+**Resposta:**
+- Status 200 OK (sem body necessário)
+- O microserviço atualiza o chamado automaticamente
+
+#### **Criar Chamado**
+```
+POST /api/calls/guinchos
+```
+
+**Body (campos adicionados):**
+```json
+{
+  "associate_car_id": 123,
+  "address": "Rua exemplo, 123",
+  "association": "solidy",
+  "towing_service_type": "towing_light",
+  "location": {
+    "latitude": -23.5505,
+    "longitude": -46.6333
+  },
+  "uf_id": 1,
+  "city_id": 1,
+  "user_id": 136  // ← Atendente vinculado automaticamente
+}
+```
+
+### **Interfaces TypeScript**
+
+#### **User (Atendente)**
+```typescript
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  email_verified_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UsersResponse {
+  data: User[];
+  pagination: Pagination;
+}
+```
+
+#### **LoginUser (Usuário Logado)**
+```typescript
+export interface LoginUser {
+  id: string;        // ID do usuário logado
+  name: string;
+  email: string;
+}
+
+export interface LoginResponse {
+  message: string;
+  user?: LoginUser;  // Retornado no login
+  token: string;
+}
+```
+
+#### **CreateTowingCallPayload**
+```typescript
+export interface CreateTowingCallPayload {
+  associate_car_id: number;
+  address: string;
+  association: string;
+  towing_service_type: string;
+  observation?: string;
+  location: {
+    latitude: number;
+    longitude: number;
+  };
+  uf_id: number;
+  city_id: number;
+  user_id?: number;  // ← Atendente vinculado
+  destination?: {
+    address?: string;
+    location?: {
+      latitude: number;
+      longitude: number;
+    };
+  };
+}
+```
+
+### **Métodos do Serviço**
+
+#### **callsService.getUsers()**
+```typescript
+/**
+ * GET /api/users
+ * Lista todos os usuários/atendentes com busca
+ */
+getUsers: async (search?: string, limit: number = 50): Promise<UsersResponse> => {
+  const params: Record<string, string | number> = { limit };
+  if (search && search.trim()) {
+    params.search = search.trim();
+  }
+  const { data } = await api.get<UsersResponse>('/api/users', { params });
+  return data;
+}
+```
+
+#### **callsService.transferCall()**
+```typescript
+/**
+ * PATCH /api/calls/guinchos/:id/transfer
+ * Transfere um chamado para outro usuário/atendente
+ */
+transferCall: async (callId: string, userId: string): Promise<void> => {
+  await api.patch(`/api/calls/guinchos/${callId}/transfer`, {
+    user_id: parseInt(userId),
+  });
+}
+```
+
+### **Fluxo Completo de Transferência**
+
+```
+1. Usuário vê a lista de chamados com coluna "Atendente"
+        ↓
+2. Clica nos 3 pontinhos do chamado desejado
+        ↓
+3. Seleciona "Transferir Atendente"
+        ↓
+4. Modal abre com informações do chamado
+        ↓
+5. Usuário digita nome ou email (mínimo 2 caracteres)
+        ↓
+6. Sistema busca usuários na API após 500ms (debounce)
+        ↓
+7. Usuário seleciona o novo atendente
+        ↓
+8. Clica em "Transferir Chamado"
+        ↓
+9. PATCH /api/calls/guinchos/{id}/transfer { user_id: 136 }
+        ↓
+10. Modal fecha e lista de chamados recarrega
+        ↓
+11. Chamado aparece com o novo atendente vinculado ✅
+```
+
+### **Comportamento de Busca (TransferCallModal)**
+
+#### **Debounce de 500ms**
+```typescript
+useEffect(() => {
+  if (!searchQuery || searchQuery.trim().length < 2) {
+    setUsers([]);
+    return;
+  }
+
+  setIsLoadingUsers(true);
+
+  const timer = setTimeout(async () => {
+    try {
+      const response = await callsService.getUsers(searchQuery.trim(), 50);
+      setUsers(response.data);
+    } catch (error) {
+      console.error("Erro ao buscar usuários:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao buscar usuários",
+        description: "Tente novamente.",
+      });
+      setUsers([]);
+    } finally {
+      setIsLoadingUsers(false);
+    }
+  }, 500);
+
+  return () => clearTimeout(timer);
+}, [searchQuery]);
+```
+
+#### **Mensagens Dinâmicas**
+- `searchQuery.length < 2`: "Digite pelo menos 2 caracteres para buscar"
+- `isLoadingUsers`: "Buscando..."
+- `users.length === 0`: "Nenhum usuário encontrado."
+
+### **localStorage**
+
+#### **Estrutura do Usuário Logado**
+```javascript
+// Salvo no login
+localStorage.setItem("token", response.token);
+localStorage.setItem("user", JSON.stringify(response.user));
+
+// Estrutura
+{
+  "id": "136",
+  "name": "Guilherme Dev",
+  "email": "guilhermedacatia132@gmail.com"
+}
+
+// Recuperado na criação de chamado
+const userStr = localStorage.getItem('user');
+const user = userStr ? JSON.parse(userStr) : null;
+const userId = user?.id ? parseInt(user.id) : undefined;
+```
+
+### **Requisitos do Backend**
+
+#### **Endpoint de Login**
+O endpoint `/api/login` **DEVE** retornar o `id` do usuário:
+
+```json
+{
+  "message": "Login realizado com sucesso",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": "136",        // ← OBRIGATÓRIO
+    "name": "Guilherme Dev",
+    "email": "guilhermedacatia132@gmail.com"
+  }
+}
+```
+
+#### **Endpoint de Listagem de Chamados**
+O endpoint `/api/calls/guinchos` **DEVE** retornar o campo `users`:
+
+```json
+{
+  "id": "43016",
+  "towing_service_type": "towing_light",
+  "user_id": "136",
+  // ... outros campos
+  "users": {
+    "id": "136",
+    "name": "Guilherme Dev",
+    "email": "guilhermedacatia132@gmail.com"
+  }
+}
+```
+
+### **Tratamento de Erros**
+
+#### **Transferência de Chamado**
+```typescript
+try {
+  await callsService.transferCall(call.id, selectedUser.id);
+  
+  toast({
+    title: "Chamado transferido com sucesso!",
+    description: `Chamado #CH-${call.id} foi transferido para ${selectedUser.name}.`,
+  });
+  
+  onOpenChange(false);
+  onSuccess?.(); // Recarrega a lista
+} catch (error: any) {
+  console.error("Erro ao transferir chamado:", error);
+  toast({
+    variant: "destructive",
+    title: "Erro ao transferir chamado",
+    description: error?.response?.data?.message || "Tente novamente mais tarde.",
+  });
+}
+```
+
+#### **Busca de Usuários**
+```typescript
+try {
+  const response = await callsService.getUsers(searchQuery.trim(), 50);
+  setUsers(response.data);
+} catch (error) {
+  console.error("Erro ao buscar usuários:", error);
+  toast({
+    variant: "destructive",
+    title: "Erro ao buscar usuários",
+    description: "Tente novamente.",
+  });
+  setUsers([]);
+}
+```
+
+### **Troubleshooting**
+
+**Atendente não aparece na listagem:**
+- Verificar se o endpoint `/api/calls/guinchos` retorna o campo `users`
+- Verificar se o `user_id` está preenchido no chamado
+- Verificar se a API faz JOIN com a tabela `users`
+
+**Erro ao transferir chamado:**
+- Verificar se o endpoint `/api/calls/guinchos/{id}/transfer` existe
+- Verificar se o método HTTP é PATCH (não POST)
+- Verificar se o `user_id` está sendo enviado corretamente no body
+
+**user_id não é enviado ao criar chamado:**
+- Verificar se o login retorna o campo `id` do usuário
+- Verificar se o `user` está salvo no localStorage
+- Verificar console.log do `user` antes de criar o chamado
+- Verificar se o `user.id` está sendo convertido para int
+
+**Busca de usuários não funciona:**
+- Verificar se o endpoint `/api/users` existe
+- Verificar se o parâmetro `search` está sendo aceito
+- Verificar se a busca retorna resultados com mínimo 2 caracteres
+- Verificar logs do console para ver requisições e respostas
+
+**"Não atribuído" mesmo após criar chamado:**
+- Verificar se o backend está salvando o `user_id` corretamente
+- Verificar se o JOIN com `users` está funcionando na listagem
+- Fazer um GET manual para verificar se o `user_id` está no banco
+
+
+### **Condições de Exibição das Mensagens**
+
+O ChatModal usa condições específicas para determinar quais mensagens exibir:
+
+#### **Mensagem SEMPRE exibida:**
+```typescript
+// 1. Saudação inicial
+messages.push({
+  role: "ai",
+  content: "Olá! Sou a assistente virtual da Utiliza. Como posso ajudá-lo hoje?",
+});
+
+// 2. Solicitação da placa
+messages.push({
+  role: "ai",
+  content: "Então DIGITE SOMENTE A PLACA do veículo para darmos continuidade ao atendimento. 👇🏼",
+});
+```
+
+#### **Mensagem CONDICIONAL (Se placa existir):**
+```typescript
+if (atendimento.associate_cars?.plate) {
+  messages.push({
+    role: "user",
+    content: atendimento.associate_cars.plate,
+  });
+}
+```
+
+#### **Mensagem CONDICIONAL (Se request_reason existir):**
+```typescript
+if (atendimento.request_reason) {
+  // Pergunta
+  messages.push({
+    role: "ai",
+    content: "Qual o motivo do contato?",
+  });
+  
+  // Resposta traduzida
+  messages.push({
+    role: "user",
+    content: reasonLabels[atendimento.request_reason] || atendimento.request_reason,
+  });
+  
+  // Confirmação
+  messages.push({
+    role: "ai",
+    content: "Entendido. Preciso fazer algumas perguntas para direcionar melhor o atendimento.",
+  });
+}
+```
+
+#### **Mensagem CONDICIONAL (Para cada campo do service_form):**
+```typescript
+if (serviceFormPayload) {
+  Object.entries(serviceFormPayload).forEach(([key, value]) => {
+    if (value && value !== "" && value !== "null") {
+      // Pergunta
+      messages.push({
+        role: "ai",
+        content: serviceFormLabels[key] || key.replace(/_/g, " "),
+      });
+      
+      // Resposta
+      messages.push({
+        role: "user",
+        content: String(value),
+      });
+    }
+  });
+}
+```
+
+#### **Mensagem CONDICIONAL (Se origin_address existir):**
+```typescript
+if (atendimento.origin_address) {
+  messages.push({
+    role: "ai",
+    content: "Por gentileza, me envie sua localização atual",
+  });
+  
+  messages.push({
+    role: "user",
+    content: atendimento.origin_address,
+  });
+}
+```
+
+#### **Mensagem CONDICIONAL (Se destination_address existir):**
+```typescript
+if (atendimento.destination_address) {
+  messages.push({
+    role: "ai",
+    content: "Agora me envie a localização de destino",
+  });
+  
+  messages.push({
+    role: "user",
+    content: atendimento.destination_address,
+  });
+}
+```
+
+#### **Mensagem CONDICIONAL (Se status for finished ou transferred):**
+```typescript
+if (atendimento.status === "finished" || atendimento.status === "transferred") {
+  messages.push({
+    role: "ai",
+    content: "Perfeito! Seu chamado foi registrado com sucesso. Um prestador será acionado em breve. Obrigado por utilizar nossos serviços!",
+  });
+}
+```
+
+### **Tabela Resumo de Condições**
+
+| Mensagem | Condição | Campo Verificado | Sempre Exibe? |
+|----------|----------|------------------|---------------|
+| Saudação inicial | - | - | ✅ Sim |
+| Solicitação da placa | - | - | ✅ Sim |
+| Resposta com placa | `if (associate_cars?.plate)` | `associate_cars.plate` | ❌ Não |
+| Motivo do contato | `if (request_reason)` | `request_reason` | ❌ Não |
+| Perguntas do service_form | `if (serviceFormPayload)` | `service_form` | ❌ Não |
+| Localização de origem | `if (origin_address)` | `origin_address` | ❌ Não |
+| Localização de destino | `if (destination_address)` | `destination_address` | ❌ Não |
+| Mensagem final | `if (status === "finished" \|\| status === "transferred")` | `status` | ❌ Não |
+
+### **Exemplo Completo de Atendimento**
+
+**Dados do Atendimento:**
+```json
+{
+  "id": "2901",
+  "status": "finished",
+  "request_reason": "flat_tire",
+  "associate_cars": {
+    "plate": "PRN8I07"
+  },
+  "service_form": {
+    "vehicle_cargo": "Sim, ferramentas",
+    "vehicle_symptom": "Motor não liga"
+  },
+  "origin_address": "Rua das Flores, 123",
+  "destination_address": "Av. Paulista, 1000"
+}
+```
+
+**Mensagens Geradas:**
+```
+1. [IA] Olá! Sou a assistente virtual da Utiliza. Como posso ajudá-lo hoje?
+2. [IA] Então DIGITE SOMENTE A PLACA do veículo para darmos continuidade ao atendimento. 👇🏼
+3. [Usuário] PRN8I07
+4. [IA] Qual o motivo do contato?
+5. [Usuário] Pneu Furado
+6. [IA] Entendido. Preciso fazer algumas perguntas para direcionar melhor o atendimento.
+7. [IA] Possui carga ou peso? → Se sim, qual tipo e quantidade?
+8. [Usuário] Sim, ferramentas
+9. [IA] O que aconteceu com o veículo (descreva o que está ocorrendo)?
+10. [Usuário] Motor não liga
+11. [IA] Por gentileza, me envie sua localização atual
+12. [Usuário] Rua das Flores, 123
+13. [IA] Agora me envie a localização de destino
+14. [Usuário] Av. Paulista, 1000
+15. [IA] Perfeito! Seu chamado foi registrado com sucesso. Um prestador será acionado em breve. Obrigado por utilizar nossos serviços!
+```
+
+**Total:** 15 mensagens geradas com base nos dados disponíveis.
+
+
+### **Detalhamento Técnico da Vinculação Automática**
+
+#### **Código Completo (ChamadoFormModal.tsx)**
+
+```typescript
+const onSubmit = async (data: ChamadoFormData) => {
+  setIsSubmitting(true);
+  try {
+    // 1. Recupera o usuário logado do localStorage
+    const userStr = localStorage.getItem('user');
+    const user = userStr ? JSON.parse(userStr) : null;
+
+    // 2. Monta o payload com TODOS os campos
+    const payload: any = {
+      associate_car_id: parseInt(data.associate_vehicle_id),
+      address: data.address,
+      association: data.association,
+      towing_service_type: data.towing_service_type,
+      observation: data.observation || undefined,
+      location: {
+        latitude: data.location.lat,
+        longitude: data.location.lng,
+      },
+      uf_id: 1, // TODO: Obter do endereço ou formulário
+      city_id: 1, // TODO: Obter do endereço ou formulário
+      user_id: user?.id ? parseInt(user.id) : undefined,  // ← Atendente vinculado
+    };
+
+    // 3. Adiciona destino se for serviço de reboque
+    if (showDestination && data.destination?.location) {
+      payload.destination = {
+        address: data.destination.address,
+        location: {
+          latitude: data.destination.location.lat,
+          longitude: data.destination.location.lng,
+        },
+      };
+    }
+
+    // 4. Envia para a API
+    const createdCall = await callsService.createTowingCall(payload);
+
+    // 5. Exibe mensagem de sucesso
+    toast({
+      title: "Chamado criado com sucesso!",
+      description: `Chamado #${createdCall.id} foi registrado no sistema.`,
+    });
+
+    // 6. Fecha o modal e recarrega a lista
+    reset();
+    onOpenChange(false);
+    onSuccess?.();
+  } catch (error: any) {
+    console.error(error);
+    toast({
+      variant: "destructive",
+      title: "Erro ao criar chamado",
+      description: error?.response?.data?.message || "Tente novamente mais tarde.",
+    });
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+```
+
+#### **Endpoint de Criação de Chamado**
+
+```
+POST http://localhost:3001/api/calls/guinchos
+Content-Type: application/json
+```
+
+#### **Exemplo de Payload Enviado**
+
+**Sem destino (serviços não-reboque):**
+```json
+{
+  "associate_car_id": 123,
+  "address": "Rua das Flores, 123 - São Paulo/SP",
+  "association": "solidy",
+  "towing_service_type": "battery_charge_light",
+  "observation": "Bateria completamente descarregada",
+  "location": {
+    "latitude": -23.550520,
+    "longitude": -46.633308
+  },
+  "uf_id": 1,
+  "city_id": 1,
+  "user_id": 136
+}
+```
+
+**Com destino (serviços de reboque):**
+```json
+{
+  "associate_car_id": 123,
+  "address": "Rua das Flores, 123 - São Paulo/SP",
+  "association": "solidy",
+  "towing_service_type": "towing_light",
+  "observation": "Veículo não liga",
+  "location": {
+    "latitude": -23.550520,
+    "longitude": -46.633308
+  },
+  "uf_id": 1,
+  "city_id": 1,
+  "user_id": 136,
+  "destination": {
+    "address": "Av. Paulista, 1000 - São Paulo/SP",
+    "location": {
+      "latitude": -23.561340,
+      "longitude": -46.655960
+    }
+  }
+}
+```
+
+#### **Validação do user_id**
+
+```typescript
+// Verifica se o usuário está logado e tem ID
+user_id: user?.id ? parseInt(user.id) : undefined
+
+// Possíveis valores:
+// - parseInt(user.id) → Envia o ID do usuário (ex: 136)
+// - undefined → Campo omitido do payload (não envia user_id)
+```
+
+#### **Fluxo Completo de Criação**
+
+```
+1. Usuário faz login
+        ↓
+2. localStorage.setItem('user', JSON.stringify({ id: "136", name: "...", email: "..." }))
+        ↓
+3. Usuário clica em "Novo Chamado"
+        ↓
+4. Preenche formulário (associado, veículo, endereço, tipo de serviço)
+        ↓
+5. Clica em "Criar Chamado"
+        ↓
+6. Frontend: localStorage.getItem('user') → { id: "136", ... }
+        ↓
+7. Frontend: Monta payload com user_id: 136
+        ↓
+8. Frontend: callsService.createTowingCall(payload)
+        ↓
+9. HTTP: POST /api/calls/guinchos { ..., user_id: 136 }
+        ↓
+10. Backend: Salva chamado com user_id = 136
+        ↓
+11. Backend: Retorna chamado criado com campo "users" preenchido
+        ↓
+12. Frontend: Exibe toast de sucesso
+        ↓
+13. Frontend: Fecha modal e recarrega lista
+        ↓
+14. Lista exibe o chamado com atendente vinculado ✅
+```
+
+#### **Comparação: Criar vs Transferir**
+
+| Operação | Endpoint | Método | Body | Quando? |
+|----------|----------|--------|------|---------|
+| **Criar Chamado** | `/api/calls/guinchos` | POST | `{ ..., user_id: 136 }` | Ao criar novo chamado |
+| **Transferir** | `/api/calls/guinchos/{id}/transfer` | PATCH | `{ user_id: 136 }` | Ao transferir chamado existente |
+
+#### **Diferenças Importantes**
+
+**Criação de Chamado:**
+- Cria um **novo** registro no banco
+- `user_id` é **opcional** (pode ser undefined)
+- Se `user_id` não for enviado, chamado fica sem atendente ("Não atribuído")
+- Envia **todos** os dados do chamado (endereço, veículo, tipo de serviço, etc.)
+
+**Transferência:**
+- Atualiza um registro **existente** no banco
+- `user_id` é **obrigatório**
+- Atualiza **apenas** o campo `user_id` do chamado
+- Não altera outros dados (endereço, veículo, status, etc.)
+
+#### **Tratamento de Erros**
+
+**Usuário não logado:**
+```typescript
+const user = null; // localStorage vazio
+const payload = {
+  // ...
+  user_id: undefined, // Campo omitido
+};
+// Chamado é criado SEM atendente vinculado
+```
+
+**ID inválido:**
+```typescript
+const user = { id: "abc" }; // ID não numérico
+const payload = {
+  // ...
+  user_id: NaN, // parseInt("abc") = NaN
+};
+// Backend pode retornar erro 400 Bad Request
+```
+
+**Tratamento correto:**
+```typescript
+// Valida antes de enviar
+user_id: user?.id && !isNaN(parseInt(user.id)) 
+  ? parseInt(user.id) 
+  : undefined
+```
+
+#### **Logs para Debug**
+
+**Console do Frontend (ao criar chamado):**
+```javascript
+console.log('Usuário logado:', user);
+// { id: "136", name: "Guilherme Dev", email: "..." }
+
+console.log('Payload enviado:', payload);
+// { associate_car_id: 123, ..., user_id: 136 }
+
+console.log('Chamado criado:', createdCall);
+// { id: "43016", user_id: "136", users: { id: "136", name: "..." }, ... }
+```
+
+**Console do Backend (ao receber requisição):**
+```
+POST /api/calls/guinchos
+Body: { associate_car_id: 123, ..., user_id: 136 }
+✅ Chamado criado com ID: 43016
+✅ Atendente vinculado: 136 (Guilherme Dev)
+```
+
+#### **Testes Sugeridos**
+
+**Teste 1: Criar chamado com usuário logado**
+```bash
+# 1. Fazer login
+curl -X POST http://localhost:3001/api/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@test.com","password":"123"}'
+# Retorna: { token: "...", user: { id: "136", ... } }
+
+# 2. Criar chamado (usar o user_id do login)
+curl -X POST http://localhost:3001/api/calls/guinchos \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer TOKEN_AQUI" \
+  -d '{
+    "associate_car_id": 123,
+    "address": "Rua teste",
+    "association": "solidy",
+    "towing_service_type": "battery",
+    "location": {"latitude": -23.5, "longitude": -46.6},
+    "uf_id": 1,
+    "city_id": 1,
+    "user_id": 136
+  }'
+
+# 3. Verificar se o chamado foi vinculado
+curl http://localhost:3001/api/calls/guinchos/{ID_RETORNADO}
+# Verificar se "users": { "id": "136", ... } está presente
+```
+
+**Teste 2: Criar chamado sem user_id**
+```bash
+# Criar chamado sem user_id
+curl -X POST http://localhost:3001/api/calls/guinchos \
+  -H "Content-Type: application/json" \
+  -d '{
+    "associate_car_id": 123,
+    "address": "Rua teste",
+    "association": "solidy",
+    "towing_service_type": "battery",
+    "location": {"latitude": -23.5, "longitude": -46.6},
+    "uf_id": 1,
+    "city_id": 1
+  }'
+# user_id não enviado → Chamado sem atendente
+```
+
+**Teste 3: Verificar na listagem**
+```bash
+# Listar chamados
+curl http://localhost:3001/api/calls/guinchos?page=1
+
+# Verificar se o campo "users" está presente nos chamados com atendente
+# e null nos chamados sem atendente
+```
+
+---
+
+## **📊 Dashboard - Métricas e Estatísticas**
+
+### **Visão Geral**
+
+O dashboard (`/dashboard`) exibe métricas em tempo real sobre atendimentos e chamados de guincho. Suporta filtros de data e atualização automática a cada 30 segundos.
+
+### **Resumo das Métricas (11 no total)**
+
+| # | Métrica | Fonte | Descrição |
+|---|---------|-------|-----------|
+| 1 | Chamados Hoje | `calls` | Total de chamados de guincho no período |
+| 2 | Em Andamento | `calls` | Chamados não finalizados |
+| 3 | Finalizados | `calls` | Chamados concluídos |
+| 4 | Atrasados | `calls` + cálculo de prazo | Chamados com prazo vencido |
+| 5 | Tempo Médio Atendimento | `associate_services` | Duração média do atendimento |
+| 6 | Tempo Médio Resposta | `associate_service_events` | Tempo médio de resposta |
+| 7 | Taxa de Resolução | Calculado | % de chamados finalizados |
+| 8 | Tempo Médio Execução | `calls` + histórico | Tempo médio de execução do guincho |
+| 9 | Ticket Médio | `bills` | Valor médio dos boletos pagos |
+| 10 | Despesa Total | `bills` | Soma dos boletos pagos |
+| 11 | Média NPS | `ratings` | Avaliação média dos guinchos |
+| 12 | Frequência Acionamento | Calculado | % de associados que acionaram |
+
+### **Endpoint da API**
+
+**URL:** `GET /api/dashboard`
+
+**Headers:**
+```
+Authorization: Bearer {token}
+```
+
+**Query Parameters (opcionais):**
+| Parâmetro | Tipo | Formato | Descrição | Exemplo |
+|-----------|------|---------|-----------|---------|
+| `start_date` | string | YYYY-MM-DD | Data inicial do período | `2026-02-01` |
+| `end_date` | string | YYYY-MM-DD | Data final do período | `2026-02-04` |
+
+**Comportamento dos Filtros:**
+
+1. **Sem filtros** → Retorna dados **apenas do dia atual** (hoje)
+2. **Apenas `start_date`** → Retorna dados **apenas desse dia específico**
+3. **Apenas `end_date`** → Retorna dados **apenas desse dia específico**
+4. **Ambos `start_date` e `end_date`** → Retorna dados **do período entre as datas** (inclusivo)
+
+**Timezone:** Todos os dados são convertidos para timezone do Brasil (UTC-3) automaticamente.
+
+### **Estrutura da Resposta**
+
+```typescript
+interface DashboardData {
+  attendancesToday: number;           // Total de chamados de guincho no período
+  attendancesInProgress: number;      // Chamados em andamento (não finalizados)
+  attendancesFinished: number;        // Chamados finalizados
+  attendancesDelayed: number;         // Chamados atrasados (prazo vencido)
+  averageServiceTime: string;         // Tempo médio de atendimento (ex: "1h 23min")
+  averageTowingExecutionTime: string; // Tempo médio de execução de guincho (ex: "45min")
+  averageNPS: string;                 // Média NPS - Avaliação dos guinchos (ex: "4.8/5.0")
+  callFrequency: string;              // Frequência de acionamento (ex: "0.15%")
+  quickStats: {
+    averageResponseTime: string;      // Tempo médio de resposta (ex: "8min 30s")
+    resolutionRate: string;           // Taxa de resolução (ex: "87.50%")
+  };
+  towingTicket: {
+    averageTicket: string;            // Ticket médio (ex: "R$ 450.00")
+    totalExpense: string;             // Despesa total (ex: "R$ 15.750,00")
+  };
+}
+```
+
+### **Métricas Calculadas**
+
+#### **1. Chamados no Período (attendancesToday)**
+- **Fonte:** Tabela `calls`
+- **Condição:** `towing_status IS NOT NULL`
+- **Filtro de data:** Campo `created_at` convertido para UTC-3
+- **Descrição:** Conta todos os chamados de guincho criados no período filtrado
+
+#### **2. Chamados em Andamento (attendancesInProgress)**
+- **Fonte:** Tabela `calls`
+- **Condição:** `towing_status IS NOT NULL AND towing_status != 'finished'`
+- **Descrição:** Chamados ainda não finalizados no período
+
+#### **3. Chamados Finalizados (attendancesFinished)**
+- **Fonte:** Tabela `calls`
+- **Condição:** `towing_status = 'finished'`
+- **Descrição:** Chamados concluídos no período
+
+#### **4. Chamados Atrasados (attendancesDelayed)**
+- **Fonte:** Tabela `calls` + relações `call_service_requests` e `call_service_proposals`
+- **Cálculo:**
+  1. Busca chamados não finalizados (`towing_status NOT IN ['finished', 'cancelled']`)
+  2. Pega `duration_between_trips_value` (tempo estimado de serviço)
+  3. Pega `duration_between_towing_driver_and_call_location_value` (tempo de chegada do guincho)
+  4. Soma os tempos e adiciona à data de criação (`created_at`)
+  5. Compara com a data/hora atual
+  6. Se data atual > prazo de conclusão → Considera atrasado
+
+#### **5. Tempo Médio de Atendimento (averageServiceTime)**
+- **Fonte:** Tabela `associate_services`
+- **Condição:** `status = 'finished' AND updated_at IS NOT NULL`
+- **Cálculo:** Média de `(updated_at - created_at)` dos atendimentos finalizados
+- **Formato:** `"1h 23min"` (horas e minutos)
+
+#### **6. Tempo Médio de Resposta (averageResponseTime)**
+- **Fonte:** Tabela `associate_service_events`
+- **Condição:** `ended_at IS NOT NULL`
+- **Filtro de data:** Campo `started_at` (não `created_at`)
+- **Cálculo:** Média de `(ended_at - started_at)` dos eventos
+- **Formato:** `"8min 30s"` (minutos e segundos)
+
+#### **7. Taxa de Resolução (resolutionRate)**
+- **Cálculo:** `(attendancesFinished / attendancesToday) * 100`
+- **Formato:** `"87.50%"` (percentual com 2 casas decimais)
+
+#### **8. Tempo Médio de Execução de Guincho (averageTowingExecutionTime)**
+- **Fonte:** Tabela `calls` + `towing_call_status_histories`
+- **Condição:** `towing_status = 'finished'`
+- **Cálculo:**
+  1. Busca o timestamp em que o chamado foi marcado como `'finished'` na tabela de histórico
+  2. Calcula `TIMESTAMPDIFF(MINUTE, created_at, finished_timestamp)`
+  3. Faz a média de todos os tempos
+- **Formato:** `"45min"` ou `"1h 23min"` (horas e minutos)
+
+#### **9. Ticket Médio e Despesa Total (towingTicket)**
+- **Fonte:** Tabela `bills` (JOIN com `calls`)
+- **Condição:** `bills.status = 'paid' AND calls.towing_status IS NOT NULL`
+- **Filtro de data:** Campo `bills.payment_date` (quando foi pago, não quando foi criado)
+- **Cálculo:**
+  - **averageTicket:** `AVG(bills.total_value)` - Média dos valores dos boletos pagos
+  - **totalExpense:** `SUM(bills.total_value)` - Soma total dos boletos pagos
+- **Formato:**
+  - averageTicket: `"R$ 450.00"` (moeda brasileira)
+  - totalExpense: `"R$ 15.750,00"` (moeda brasileira)
+
+#### **10. Média NPS - Avaliação dos Guinchos (averageNPS)**
+- **Fonte:** Tabela `ratings` (JOIN com `calls`)
+- **Condição:** `calls.towing_status IS NOT NULL AND ratings.rating IS NOT NULL`
+- **Filtro de data:** Campo `ratings.created_at` convertido para UTC-3
+- **Cálculo:**
+  1. Busca todas as avaliações (`rating`) da tabela `ratings`
+  2. Faz JOIN com `calls` para filtrar apenas avaliações de chamados de guincho
+  3. Calcula `AVG(ratings.rating)` - Média de todas as avaliações
+  4. Conta `COUNT(*)` - Total de avaliações no período
+- **Formato:** `"4.8/5.0"` (nota média sobre 5.0)
+- **Query SQL:**
+```sql
+SELECT
+  AVG(r.rating) as average_rating,
+  COUNT(*) as total_ratings
+FROM ratings r
+INNER JOIN calls c ON r.call_id = c.id
+WHERE c.towing_status IS NOT NULL
+  AND r.rating IS NOT NULL
+  AND DATE(CONVERT_TZ(r.created_at, '+00:00', '-03:00')) BETWEEN '2026-02-01' AND '2026-02-04'
+```
+
+#### **11. Frequência de Acionamento (callFrequency)**
+- **Fonte:** Tabela `associates` + métrica `attendancesToday`
+- **Cálculo:** `(attendancesToday / totalAssociates) * 100`
+- **Descrição:** Percentual de acionamento em relação à base de clientes
+- **Formato:** `"0.15%"` (percentual com 2 casas decimais)
+- **Exemplo:**
+  - Total de associados na base: 30.000
+  - Chamados no período: 45
+  - Frequência: (45 / 30.000) * 100 = 0.15%
+- **Uso:** Indica quantos % dos associados acionaram o serviço no período
+
+### **Dados Mocados**
+
+⚠️ **IMPORTANTE:** Quando os valores reais estão vazios ou zerados, o backend retorna **dados fictícios** (mocked data) para demonstração:
+
+```typescript
+// Valores Mocados (quando dados reais estão vazios)
+{
+  attendancesToday: 45,
+  attendancesInProgress: 12,
+  attendancesFinished: 33,
+  averageServiceTime: "1h 23min",
+  averageTowingExecutionTime: "45min",
+  averageNPS: "4.8/5.0",
+  callFrequency: "0.15%",
+  quickStats: {
+    averageResponseTime: "8min",
+    resolutionRate: "87.50%"
+  },
+  towingTicket: {
+    averageTicket: "R$ 450.00",
+    totalExpense: "R$ 15.750,00"
+  }
+}
+```
+
+**Quando os dados mocados são usados:**
+- `attendancesToday || 45` → Se não houver chamados, mostra 45
+- `averageServiceTime || "1h 23min"` → Se não houver atendimentos finalizados, mostra 1h 23min
+- E assim por diante para todas as métricas
+
+### **Exemplos de Requisições**
+
+#### **1. Dashboard do Dia Atual (padrão)**
+```bash
+curl -X GET http://localhost:3001/api/dashboard \
+  -H "Authorization: Bearer {token}"
+```
+**Resultado:** Dados de hoje (00:00:00 até 23:59:59)
+
+#### **2. Dashboard de um Dia Específico**
+```bash
+curl -X GET "http://localhost:3001/api/dashboard?start_date=2026-02-01" \
+  -H "Authorization: Bearer {token}"
+```
+**Resultado:** Dados apenas do dia 01/02/2026
+
+#### **3. Dashboard de um Período**
+```bash
+curl -X GET "http://localhost:3001/api/dashboard?start_date=2026-02-01&end_date=2026-02-04" \
+  -H "Authorization: Bearer {token}"
+```
+**Resultado:** Dados de 01/02/2026 00:00:00 até 04/02/2026 23:59:59
+
+### **Frontend - Implementação**
+
+#### **Arquivo:** `src/services/dashboard.service.ts`
+
+```typescript
+export interface DashboardFilters {
+  start_date?: string; // Formato: YYYY-MM-DD
+  end_date?: string;   // Formato: YYYY-MM-DD
+}
+
+export const dashboardService = {
+  getData: async (filters?: DashboardFilters): Promise<DashboardData> => {
+    const params = new URLSearchParams();
+    if (filters?.start_date) params.append('start_date', filters.start_date);
+    if (filters?.end_date) params.append('end_date', filters.end_date);
+
+    const queryString = params.toString();
+    const url = `/api/dashboard${queryString ? `?${queryString}` : ''}`;
+
+    const { data } = await api.get<DashboardData>(url);
+    return data;
+  },
+};
+```
+
+#### **Arquivo:** `src/pages/Index.tsx`
+
+```typescript
+// Estado para filtros
+const [filters, setFilters] = useState<DashboardFilters | undefined>(undefined);
+
+// Busca dados com filtros
+const fetchDashboardData = useCallback(async () => {
+  const data = await dashboardService.getData(filters);
+  setDashboardData(data);
+}, [filters]);
+
+// Atualização automática a cada 30 segundos
+useEffect(() => {
+  fetchDashboardData();
+  const interval = setInterval(fetchDashboardData, 30000);
+  return () => clearInterval(interval);
+}, [fetchDashboardData]);
+
+// Aplicar filtro de data
+const handleApplyFilter = (startDate: string, endDate: string) => {
+  setFilters({ start_date: startDate, end_date: endDate });
+};
+
+// Limpar filtro (volta para dia atual)
+const handleClearFilter = () => {
+  setFilters(undefined);
+};
+```
+
+### **Componente de Filtro de Data**
+
+**Arquivo:** `src/components/dashboard/DateRangeFilter.tsx`
+
+- Permite selecionar período de datas
+- Ambas as datas (início e fim) são **obrigatórias** para aplicar o filtro
+- Botão "Limpar Filtro" volta para o padrão (dia atual)
+
+### **Cards de Métricas Exibidos**
+
+**Arquivo:** `src/pages/Index.tsx`
+
+**Grid principal (3 colunas):**
+1. **Chamados Hoje** - `attendancesToday` (ícone: Headphones, cor: primary)
+2. **Em Andamento** - `attendancesInProgress` (ícone: PhoneCall, cor: warning)
+3. **Finalizados** - `attendancesFinished` (ícone: CheckCircle, cor: success)
+
+**Grid secundário (3 colunas):**
+4. **Média NPS** - `averageNPS` (ícone: Star, cor: warning)
+5. **Tempo Médio de Execução** - `averageTowingExecutionTime` (ícone: Truck, cor: info)
+6. **Ticket Médio** - `towingTicket.averageTicket` (ícone: DollarSign, cor: teal)
+
+**Grid terciário (4 colunas):**
+7. **Despesa Total** - `towingTicket.totalExpense` (ícone: CreditCard, cor: success, compact)
+8. **Taxa de Resolução** - `quickStats.resolutionRate` (ícone: CheckCircle2, cor: primary)
+9. **Atrasos** - `attendancesDelayed` (ícone: AlertCircle, cor: danger)
+10. **Frequência de Acionamento** - `callFrequency` (ícone: Activity, cor: info, compact)
+
+**Componente QuickStats:**
+11. **Tempo Médio de Atendimento** - `averageServiceTime`
+
+### **Diferenças Importantes: Filtros de Data**
+
+| Campo da Tabela | Usado para Filtrar | Métrica |
+|-----------------|-------------------|---------|
+| `calls.created_at` | ✅ | Chamados Hoje, Em Andamento, Finalizados, Atrasados, Tempo Médio de Execução de Guincho |
+| `associate_services.created_at` | ✅ | Tempo Médio de Atendimento |
+| `associate_service_events.started_at` | ✅ | Tempo Médio de Resposta |
+| `ratings.created_at` | ✅ | Média NPS (Avaliação dos Guinchos) |
+| `bills.payment_date` | ✅ | Ticket Médio, Despesa Total |
+
+**Observação:** Cada métrica usa o campo de data mais apropriado para seu contexto:
+- **Chamados** → `created_at` (quando foi criado)
+- **Eventos** → `started_at` (quando iniciou)
+- **Avaliações** → `created_at` (quando foi avaliado)
+- **Boletos** → `payment_date` (quando foi pago, não quando foi criado)
+- **Frequência de Acionamento** → Não usa filtro de data direto, calcula com base no `attendancesToday` do período
+
+### **Fluxo Completo**
+
+```
+1. Usuário acessa /dashboard
+        ↓
+2. Frontend: dashboardService.getData() sem filtros
+        ↓
+3. API: GET /api/dashboard (sem query params)
+        ↓
+4. Backend: Usa data atual (hoje)
+        ↓
+5. Backend: Calcula todas as métricas com dateCondition = "hoje"
+        ↓
+6. Backend: Se dados vazios → Retorna dados mocados
+        ↓
+7. Frontend: Renderiza cards com valores
+        ↓
+8. Após 30 segundos: Repete busca automaticamente
+        ↓
+9. Usuário aplica filtro (ex: 01/02 a 04/02)
+        ↓
+10. Frontend: setFilters({ start_date: "2026-02-01", end_date: "2026-02-04" })
+        ↓
+11. useEffect detecta mudança em filters
+        ↓
+12. API: GET /api/dashboard?start_date=2026-02-01&end_date=2026-02-04
+        ↓
+13. Backend: Usa dateCondition com período especificado
+        ↓
+14. Frontend: Atualiza cards com novos valores
+```
+
+### **Validações e Erros**
+
+#### **Formato de Data Inválido**
+```bash
+GET /api/dashboard?start_date=01/02/2026
+```
+**Resposta:**
+```json
+{
+  "error": "Formato de start_date inválido. Use YYYY-MM-DD (ex: 2026-02-04)"
+}
+```
+**Status:** `400 Bad Request`
+
+#### **Token Ausente ou Inválido**
+```bash
+GET /api/dashboard
+# Sem header Authorization
+```
+**Resposta:**
+```json
+{
+  "error": "Não autorizado. Token obrigatório."
+}
+```
+**Status:** `401 Unauthorized`
+
+### **Logs de Debug (Backend)**
+
+Ao executar uma requisição, os logs exibem:
+```sql
+-- Exemplo de query executada (chamados de hoje)
+SELECT COUNT(*) as count
+FROM calls
+WHERE towing_status IS NOT NULL
+  AND DATE(CONVERT_TZ(created_at, '+00:00', '-03:00')) = DATE(CONVERT_TZ(NOW(), '+00:00', '-03:00'))
+```
+
+```sql
+-- Exemplo de query com filtro de período
+SELECT COUNT(*) as count
+FROM calls
+WHERE towing_status IS NOT NULL
+  AND DATE(CONVERT_TZ(created_at, '+00:00', '-03:00')) BETWEEN '2026-02-01' AND '2026-02-04'
+```
+
+### **Considerações de Performance**
+
+1. **Cache:** Não há cache implementado. Cada requisição executa queries no banco.
+2. **Atualização automática:** Frontend atualiza a cada 30 segundos.
+3. **Queries complexas:** Algumas métricas fazem JOINs e subconsultas (ex: chamados atrasados).
+4. **Timezone:** Todas as conversões UTC → UTC-3 são feitas no banco de dados.
+
+### **Testes Sugeridos**
+
+#### **Teste 1: Dashboard sem filtros (dia atual)**
+```bash
+curl -X GET http://localhost:3001/api/dashboard \
+  -H "Authorization: Bearer {seu_token}"
+```
+**Verificar:** Retorna métricas do dia atual
+
+#### **Teste 2: Dashboard com período específico**
+```bash
+curl -X GET "http://localhost:3001/api/dashboard?start_date=2026-02-01&end_date=2026-02-04" \
+  -H "Authorization: Bearer {seu_token}"
+```
+**Verificar:** Retorna métricas do período especificado
+
+#### **Teste 3: Verificar dados mocados**
+```bash
+# Usar uma data sem dados (ex: futuro distante)
+curl -X GET "http://localhost:3001/api/dashboard?start_date=2030-01-01" \
+  -H "Authorization: Bearer {seu_token}"
+```
+**Verificar:** Retorna valores mocados (45, 12, 33, etc.)
+
+#### **Teste 4: Validação de formato de data**
+```bash
+curl -X GET "http://localhost:3001/api/dashboard?start_date=01-02-2026" \
+  -H "Authorization: Bearer {seu_token}"
+```
+**Verificar:** Retorna erro 400 com mensagem de formato inválido
+
+---
+
+## **📊 Exemplos Detalhados de Cálculo**
+
+### **Exemplo 1: Frequência de Acionamento**
+
+**Cenário:**
+- Total de associados cadastrados: 30.000
+- Chamados no dia: 45
+- Período filtrado: Hoje (01/02/2026)
+
+**Cálculo:**
+```typescript
+const totalAssociates = 30000; // Total de registros na tabela associates
+const attendancesToday = 45;   // Chamados criados hoje
+
+const callFrequency = (attendancesToday / totalAssociates) * 100;
+// = (45 / 30000) * 100
+// = 0.0015 * 100
+// = 0.15%
+```
+
+**Query SQL:**
+```sql
+-- 1. Conta total de associados
+SELECT COUNT(*) FROM associates;
+-- Resultado: 30000
+
+-- 2. Usa o attendancesToday já calculado
+-- attendancesToday = 45 (chamados do período filtrado)
+
+-- 3. Calcula a frequência
+-- callFrequency = (45 / 30000) * 100 = 0.15%
+```
+
+**Retorno da API:**
+```json
+{
+  "callFrequency": "0.15%"
+}
+```
+
+**Interpretação:**
+- 0.15% dos associados acionaram o serviço no período
+- Em cada 10.000 associados, aproximadamente 15 acionaram
+- Taxa de utilização baixa (esperado para serviços de emergência)
+
+---
+
+### **Exemplo 2: Média NPS**
+
+**Cenário:**
+- Período filtrado: 01/02/2026 a 04/02/2026
+- Avaliações recebidas:
+  - Call #1001: 5.0 ⭐⭐⭐⭐⭐
+  - Call #1002: 4.5 ⭐⭐⭐⭐☆
+  - Call #1003: 5.0 ⭐⭐⭐⭐⭐
+  - Call #1004: 4.0 ⭐⭐⭐⭐
+  - Call #1005: 4.8 ⭐⭐⭐⭐⭐
+
+**Cálculo:**
+```typescript
+const ratings = [5.0, 4.5, 5.0, 4.0, 4.8];
+const totalRatings = 5;
+const sumRatings = 5.0 + 4.5 + 5.0 + 4.0 + 4.8 = 23.3;
+
+const averageNPS = sumRatings / totalRatings;
+// = 23.3 / 5
+// = 4.66
+// = "4.7/5.0" (arredondado para 1 casa decimal)
+```
+
+**Query SQL:**
+```sql
+SELECT
+  AVG(r.rating) as average_rating,
+  COUNT(*) as total_ratings
+FROM ratings r
+INNER JOIN calls c ON r.call_id = c.id
+WHERE c.towing_status IS NOT NULL
+  AND r.rating IS NOT NULL
+  AND DATE(CONVERT_TZ(r.created_at, '+00:00', '-03:00')) BETWEEN '2026-02-01' AND '2026-02-04';
+
+-- Resultado:
+-- average_rating: 4.66
+-- total_ratings: 5
+```
+
+**Retorno da API:**
+```json
+{
+  "averageNPS": "4.7/5.0"
+}
+```
+
+**Interpretação:**
+- Média de 4.7 estrelas de 5.0 possíveis
+- Alta satisfação dos clientes (93.2%)
+- 5 avaliações recebidas no período
+
+---
+
+### **Exemplo 3: Ticket Médio e Despesa Total**
+
+**Cenário:**
+- Período filtrado: 01/02/2026 a 04/02/2026
+- Boletos pagos no período:
+  - Boleto #001: R$ 350,00 (pago em 02/02)
+  - Boleto #002: R$ 500,00 (pago em 03/02)
+  - Boleto #003: R$ 450,00 (pago em 04/02)
+  - Boleto #004: R$ 600,00 (pago em 04/02)
+
+**Cálculo:**
+```typescript
+const paidBills = [350.00, 500.00, 450.00, 600.00];
+const totalExpense = 350 + 500 + 450 + 600 = 1900.00;
+const averageTicket = 1900.00 / 4 = 475.00;
+```
+
+**Query SQL:**
+```sql
+SELECT
+  SUM(b.total_value) as total_expense,
+  AVG(b.total_value) as average_ticket
+FROM bills b
+INNER JOIN calls c ON b.call_id = c.id
+WHERE b.status = 'paid'
+  AND c.towing_status IS NOT NULL
+  AND DATE(CONVERT_TZ(b.payment_date, '+00:00', '-03:00')) BETWEEN '2026-02-01' AND '2026-02-04';
+
+-- Resultado:
+-- total_expense: 1900.00
+-- average_ticket: 475.00
+```
+
+**Retorno da API:**
+```json
+{
+  "towingTicket": {
+    "averageTicket": "R$ 475.00",
+    "totalExpense": "R$ 1.900,00"
+  }
+}
+```
+
+**Interpretação:**
+- Ticket médio de R$ 475,00 por serviço pago
+- Receita total de R$ 1.900,00 no período
+- 4 boletos foram pagos
+
+**⚠️ Importante:** Usa `payment_date` (quando foi pago), não `created_at` (quando foi criado). Boletos criados no período mas pagos depois não são contabilizados.
+

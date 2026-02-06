@@ -613,6 +613,7 @@ export interface CreateTowingCallPayload {
   };
   uf_id: number;
   city_id: number;
+  user_id?: number;
   destination?: {
     address?: string;
     location?: {
@@ -620,6 +621,21 @@ export interface CreateTowingCallPayload {
       longitude: number;
     };
   };
+}
+
+// Interface para Usuário/Atendente
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  email_verified_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UsersResponse {
+  data: User[];
+  pagination: Pagination;
 }
 
 export const callsService = {
@@ -637,6 +653,29 @@ export const callsService = {
     if (search && search.trim()) params.search = search.trim();
     const { data } = await api.get<CallsResponse>('/api/calls/guinchos', { params });
     return data;
+  },
+
+  /**
+   * GET /api/users
+   * Lista todos os usuários/atendentes com busca
+   */
+  getUsers: async (search?: string, limit: number = 50): Promise<UsersResponse> => {
+    const params: Record<string, string | number> = { limit };
+    if (search && search.trim()) {
+      params.search = search.trim();
+    }
+    const { data } = await api.get<UsersResponse>('/api/users', { params });
+    return data;
+  },
+
+  /**
+   * PATCH /api/calls/guinchos/:id/transfer
+   * Transfere um chamado para outro usuário/atendente
+   */
+  transferCall: async (callId: string, userId: string): Promise<void> => {
+    await api.patch(`/api/calls/guinchos/${callId}/transfer`, {
+      user_id: parseInt(userId),
+    });
   },
 
   /**

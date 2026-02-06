@@ -11,8 +11,7 @@ export interface QuickStats {
 
 export interface TowingTicket {
   averageTicket: string;
-  totalRevenue: string;
-  paidBillsCount: number;
+  totalExpense: string;
 }
 
 export interface AssociateCar {
@@ -74,6 +73,8 @@ export interface DashboardData {
   attendancesDelayed: number;
   averageServiceTime: string;
   averageTowingExecutionTime: string;
+  averageNPS: string;
+  callFrequency: string;
   quickStats: QuickStats;
   towingTicket: TowingTicket;
   recentAttendances: RecentAttendance[];
