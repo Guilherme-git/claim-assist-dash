@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 import { ChamadoFormModal } from "@/components/chamados/chamadoFormModal";
 import { TransferCallModal } from "@/components/chamados/TransferCallModal";
+import { StatusCards } from "@/components/chamados/StatusCards";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -72,6 +73,20 @@ const statusIcons: Record<string, any> = {
   finished: CheckCircle2,
   cancelled: XCircle,
 };
+
+// Mock de contagem por status (simulando dados da API)
+const mockStatusCounts = [
+  { status: "waiting_driver_accept", count: 12 },
+  { status: "waiting_driver_access_app_after_call_accepted", count: 5 },
+  { status: "waiting_arrival_to_checkin", count: 18 },
+  { status: "in_checking", count: 8 },
+  { status: "waiting_arrival_to_checkout", count: 14 },
+  { status: "in_checkout", count: 6 },
+  { status: "waiting_in_shed", count: 3 },
+  { status: "waiting_add_towing_delivery_call_trip", count: 7 },
+  { status: "finished", count: 156 },
+  { status: "cancelled", count: 23 },
+];
 
 export default function Chamados() {
   const navigate = useNavigate();
@@ -148,6 +163,13 @@ export default function Chamados() {
         </div>
       </div>
 
+      {/* Status Cards */}
+      <StatusCards
+        statusCounts={mockStatusCounts}
+        activeStatus={statusFilter}
+        onStatusClick={(status) => applyFilter(setStatusFilter, status)}
+      />
+
       {/* Filtros */}
       <div className="mb-6 flex items-center gap-3 flex-wrap">
          {/* Filtro de Associação (calls_association) */}
@@ -184,27 +206,6 @@ export default function Chamados() {
             <SelectItem className="cursor-pointer" value="towing_heavy">Reboque Pesado</SelectItem>
           </SelectContent>
         </Select>
-
-        {/* Filtro de Status */}
-        <Select value={statusFilter} onValueChange={(v) => applyFilter(setStatusFilter, v)}>
-          <SelectTrigger className="w-[220px] h-10 rounded-xl">
-            <SelectValue placeholder="Filtrar por Status" />
-          </SelectTrigger>
-          <SelectContent className="cursor-pointer max-h-[300px]">
-            <SelectItem className="cursor-pointer" value="todos">Todos os Status</SelectItem>
-            <SelectItem className="cursor-pointer" value="waiting_driver_accept">Aguardando aceite do motorista</SelectItem>
-            <SelectItem className="cursor-pointer" value="waiting_driver_access_app_after_call_accepted">Aguardando motorista acessar app</SelectItem>
-            <SelectItem className="cursor-pointer" value="waiting_arrival_to_checkin">Aguardando chegada para checkin</SelectItem>
-            <SelectItem className="cursor-pointer" value="in_checking">Em checkin</SelectItem>
-            <SelectItem className="cursor-pointer" value="waiting_arrival_to_checkout">Aguardando chegada para checkout</SelectItem>
-            <SelectItem className="cursor-pointer" value="in_checkout">Em checkout</SelectItem>
-            <SelectItem className="cursor-pointer" value="waiting_in_shed">Aguardando na garagem</SelectItem>
-            <SelectItem className="cursor-pointer" value="waiting_add_towing_delivery_call_trip">Aguardando adicionar viagem</SelectItem>
-            <SelectItem className="cursor-pointer" value="finished">Finalizado</SelectItem>
-            <SelectItem className="cursor-pointer" value="cancelled">Cancelado</SelectItem>
-          </SelectContent>
-        </Select>
-
         {/* Botão Limpar Filtros */}
         {(serviceTypeFilter !== "todos" || associationFilter !== "todos" || statusFilter !== "todos" || searchTerm) && (
           <Button
