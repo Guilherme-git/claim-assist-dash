@@ -96,9 +96,12 @@ export function StatusCards({ statusCounts, activeStatus, onStatusClick, loading
   const buttonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   
   // Drag to scroll state
-  const [isDragging, setIsDragging] = useState(false);
+  const [isMouseDown, setIsMouseDown] = useState(false);
+  const [hasDragged, setHasDragged] = useState(false);
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
+  
+  const DRAG_THRESHOLD = 5; // Pixels before considering it a drag
 
   // Scroll to active status when it changes
   useEffect(() => {
@@ -114,37 +117,39 @@ export function StatusCards({ statusCounts, activeStatus, onStatusClick, loading
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (!containerRef.current) return;
-    setIsDragging(true);
+    setIsMouseDown(true);
+    setHasDragged(false);
     setStartX(e.pageX - containerRef.current.offsetLeft);
     setScrollLeft(containerRef.current.scrollLeft);
-    containerRef.current.style.cursor = "grabbing";
   }, []);
 
   const handleMouseUp = useCallback(() => {
-    setIsDragging(false);
-    if (containerRef.current) {
-      containerRef.current.style.cursor = "grab";
-    }
+    setIsMouseDown(false);
+    // Reset hasDragged after a short delay to allow click to process
+    setTimeout(() => setHasDragged(false), 0);
   }, []);
 
   const handleMouseLeave = useCallback(() => {
-    setIsDragging(false);
-    if (containerRef.current) {
-      containerRef.current.style.cursor = "grab";
-    }
+    setIsMouseDown(false);
   }, []);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isDragging || !containerRef.current) return;
-    e.preventDefault();
+    if (!isMouseDown || !containerRef.current) return;
+    
     const x = e.pageX - containerRef.current.offsetLeft;
-    const walk = (x - startX) * 1.5; // Scroll speed multiplier
-    containerRef.current.scrollLeft = scrollLeft - walk;
-  }, [isDragging, startX, scrollLeft]);
+    const walk = x - startX;
+    
+    // Only start dragging if we've moved past the threshold
+    if (Math.abs(walk) > DRAG_THRESHOLD) {
+      setHasDragged(true);
+      e.preventDefault();
+      containerRef.current.scrollLeft = scrollLeft - walk * 1.5;
+    }
+  }, [isMouseDown, startX, scrollLeft]);
 
   const handleStatusClick = (status: string) => {
     // Only trigger click if not dragging (to prevent accidental clicks while scrolling)
-    if (!isDragging) {
+    if (!hasDragged) {
       onStatusClick(status);
     }
   };
@@ -162,8 +167,8 @@ export function StatusCards({ statusCounts, activeStatus, onStatusClick, loading
       <div 
         ref={containerRef}
         className={cn(
-          "flex gap-2 overflow-x-auto pb-2 scrollbar-hide scroll-smooth cursor-grab select-none",
-          isDragging && "cursor-grabbing"
+          "flex gap-2 overflow-x-auto pb-2 scrollbar-hide scroll-smooth select-none",
+          isMouseDown ? "cursor-grabbing" : "cursor-grab"
         )}
         onMouseDown={handleMouseDown}
         onMouseUp={handleMouseUp}
