@@ -8,7 +8,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { callTowingStatusLabels } from "@/services/calls.service";
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 
 interface StatusCount {
   status: string;
@@ -94,6 +94,11 @@ export function StatusCards({ statusCounts, activeStatus, onStatusClick, loading
   const totalCount = statusCounts.reduce((acc, curr) => acc + curr.count, 0);
   const containerRef = useRef<HTMLDivElement>(null);
   const buttonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  
+  // Drag to scroll state
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
 
   // Scroll to active status when it changes
   useEffect(() => {
@@ -107,8 +112,41 @@ export function StatusCards({ statusCounts, activeStatus, onStatusClick, loading
     }
   }, [activeStatus]);
 
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (!containerRef.current) return;
+    setIsDragging(true);
+    setStartX(e.pageX - containerRef.current.offsetLeft);
+    setScrollLeft(containerRef.current.scrollLeft);
+    containerRef.current.style.cursor = "grabbing";
+  }, []);
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+    if (containerRef.current) {
+      containerRef.current.style.cursor = "grab";
+    }
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    setIsDragging(false);
+    if (containerRef.current) {
+      containerRef.current.style.cursor = "grab";
+    }
+  }, []);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isDragging || !containerRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - containerRef.current.offsetLeft;
+    const walk = (x - startX) * 1.5; // Scroll speed multiplier
+    containerRef.current.scrollLeft = scrollLeft - walk;
+  }, [isDragging, startX, scrollLeft]);
+
   const handleStatusClick = (status: string) => {
-    onStatusClick(status);
+    // Only trigger click if not dragging (to prevent accidental clicks while scrolling)
+    if (!isDragging) {
+      onStatusClick(status);
+    }
   };
 
   if (loading) {
@@ -123,7 +161,14 @@ export function StatusCards({ statusCounts, activeStatus, onStatusClick, loading
     <div className="mb-6">
       <div 
         ref={containerRef}
-        className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide scroll-smooth"
+        className={cn(
+          "flex gap-2 overflow-x-auto pb-2 scrollbar-hide scroll-smooth cursor-grab select-none",
+          isDragging && "cursor-grabbing"
+        )}
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
+        onMouseMove={handleMouseMove}
       >
         {/* Card "Todos" */}
         <button
