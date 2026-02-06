@@ -8,6 +8,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { callTowingStatusLabels } from "@/services/calls.service";
+import { useRef, useEffect } from "react";
 
 interface StatusCount {
   status: string;
@@ -91,6 +92,24 @@ const shortLabels: Record<string, string> = {
 
 export function StatusCards({ statusCounts, activeStatus, onStatusClick, loading }: StatusCardsProps) {
   const totalCount = statusCounts.reduce((acc, curr) => acc + curr.count, 0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const buttonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+
+  // Scroll to active status when it changes
+  useEffect(() => {
+    const activeButton = buttonRefs.current.get(activeStatus);
+    if (activeButton && containerRef.current) {
+      activeButton.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "center",
+      });
+    }
+  }, [activeStatus]);
+
+  const handleStatusClick = (status: string) => {
+    onStatusClick(status);
+  };
 
   if (loading) {
     return (
@@ -102,10 +121,16 @@ export function StatusCards({ statusCounts, activeStatus, onStatusClick, loading
 
   return (
     <div className="mb-6">
-      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+      <div 
+        ref={containerRef}
+        className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide scroll-smooth"
+      >
         {/* Card "Todos" */}
         <button
-          onClick={() => onStatusClick("todos")}
+          ref={(el) => {
+            if (el) buttonRefs.current.set("todos", el);
+          }}
+          onClick={() => handleStatusClick("todos")}
           className={cn(
             "flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all duration-200",
             "hover:shadow-md hover:-translate-y-0.5",
@@ -142,7 +167,10 @@ export function StatusCards({ statusCounts, activeStatus, onStatusClick, loading
           return (
             <button
               key={status}
-              onClick={() => onStatusClick(status)}
+              ref={(el) => {
+                if (el) buttonRefs.current.set(status, el);
+              }}
+              onClick={() => handleStatusClick(status)}
               className={cn(
                 "flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all duration-200",
                 "hover:shadow-md hover:-translate-y-0.5",
