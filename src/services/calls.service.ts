@@ -327,9 +327,15 @@ export interface Pagination {
   to: number;
 }
 
+export interface StatusCount {
+  status: string;
+  count: number;
+}
+
 export interface CallsResponse {
   data: Call[];
   pagination: Pagination;
+  status_counts: StatusCount[];
 }
 
 export interface OpenCall {

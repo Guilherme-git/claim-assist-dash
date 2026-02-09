@@ -118,9 +118,15 @@ export interface Pagination {
   to: number;
 }
 
+export interface StatusCount {
+  status: string;
+  count: number;
+}
+
 export interface AssociateServicesResponse {
   data: AssociateService[];
   pagination: Pagination;
+  status_counts: StatusCount[];
 }
 
 export interface AtendimentosFilters {

@@ -3,11 +3,10 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  XCircle,
-  Truck,
+  MapPin,
+  MessageCircle,
   Loader2,
 } from "lucide-react";
-import { callTowingStatusLabels } from "@/services/calls.service";
 import { useRef, useEffect, useState, useCallback } from "react";
 
 interface StatusCount {
@@ -22,87 +21,73 @@ interface StatusCardsProps {
   loading?: boolean;
 }
 
-// Ícones e cores por status
+// Ícones e cores por status de atendimento
 const statusConfig: Record<string, { icon: any; color: string; bgColor: string }> = {
-  waiting_driver_accept: {
-    icon: Clock,
+  waiting_identification: {
+    icon: AlertCircle,
     color: "text-warning",
     bgColor: "bg-warning/10 border-warning/20",
   },
-  waiting_driver_access_app_after_call_accepted: {
-    icon: Clock,
+  waiting_request_reason: {
+    icon: AlertCircle,
     color: "text-warning",
     bgColor: "bg-warning/10 border-warning/20",
   },
-  waiting_arrival_to_checkin: {
-    icon: Truck,
+  answering_service_form: {
+    icon: Clock,
     color: "text-info",
     bgColor: "bg-info/10 border-info/20",
   },
-  in_checking: {
-    icon: CheckCircle2,
-    color: "text-primary",
-    bgColor: "bg-primary/10 border-primary/20",
-  },
-  waiting_arrival_to_checkout: {
-    icon: Truck,
-    color: "text-info",
-    bgColor: "bg-info/10 border-info/20",
-  },
-  in_checkout: {
-    icon: CheckCircle2,
-    color: "text-primary",
-    bgColor: "bg-primary/10 border-primary/20",
-  },
-  waiting_in_shed: {
+  waiting_understanding_wpp_flow: {
     icon: Clock,
     color: "text-muted-foreground",
     bgColor: "bg-muted border-border",
   },
-  waiting_add_towing_delivery_call_trip: {
-    icon: AlertCircle,
-    color: "text-destructive",
-    bgColor: "bg-destructive/10 border-destructive/20",
+  waiting_origin_location: {
+    icon: MapPin,
+    color: "text-warning",
+    bgColor: "bg-warning/10 border-warning/20",
+  },
+  waiting_destination_location: {
+    icon: MapPin,
+    color: "text-warning",
+    bgColor: "bg-warning/10 border-warning/20",
+  },
+  transferred: {
+    icon: CheckCircle2,
+    color: "text-info",
+    bgColor: "bg-info/10 border-info/20",
   },
   finished: {
     icon: CheckCircle2,
     color: "text-success",
     bgColor: "bg-success/10 border-success/20",
   },
-  cancelled: {
-    icon: XCircle,
-    color: "text-destructive",
-    bgColor: "bg-destructive/10 border-destructive/20",
-  },
 };
 
 // Labels curtos para os cards
 const shortLabels: Record<string, string> = {
-  waiting_driver_accept: "Aguardando Aceite",
-  waiting_driver_access_app_after_call_accepted: "Aguardando App",
-  waiting_arrival_to_checkin: "A caminho (Checkin)",
-  in_checking: "Em Checkin",
-  waiting_arrival_to_checkout: "A caminho (Checkout)",
-  in_checkout: "Em Checkout",
-  waiting_in_shed: "Na Garagem",
-  waiting_add_towing_delivery_call_trip: "Aguardando Viagem",
+  waiting_identification: "Identificação",
+  waiting_request_reason: "Motivo",
+  answering_service_form: "Formulário",
+  waiting_understanding_wpp_flow: "Fluxo WPP",
+  waiting_origin_location: "Local Origem",
+  waiting_destination_location: "Local Destino",
+  transferred: "Transferido",
   finished: "Finalizados",
-  cancelled: "Cancelados",
 };
 
 export function StatusCards({ statusCounts, activeStatus, onStatusClick, loading }: StatusCardsProps) {
   // Lista de todos os status possíveis (na ordem de exibição)
   const allStatuses = [
-    "waiting_driver_accept",
-    "waiting_driver_access_app_after_call_accepted",
-    "waiting_arrival_to_checkin",
-    "in_checking",
-    "waiting_arrival_to_checkout",
-    "in_checkout",
-    "waiting_in_shed",
-    "waiting_add_towing_delivery_call_trip",
+    "waiting_identification",
+    "waiting_request_reason",
+    "answering_service_form",
+    "waiting_understanding_wpp_flow",
+    "waiting_origin_location",
+    "waiting_destination_location",
+    "transferred",
     "finished",
-    "cancelled",
   ];
 
   // Criar mapa de contagens
@@ -114,19 +99,16 @@ export function StatusCards({ statusCounts, activeStatus, onStatusClick, loading
     count: countsMap.get(status) || 0,
   }));
 
-  // Debug: verificar quantos status estão sendo renderizados
-  console.log('StatusCards - Total de status:', completeStatusCounts.length, completeStatusCounts);
-
   const totalCount = statusCounts.reduce((acc, curr) => acc + curr.count, 0);
   const containerRef = useRef<HTMLDivElement>(null);
   const buttonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
-  
+
   // Drag to scroll state
   const [isMouseDown, setIsMouseDown] = useState(false);
   const [hasDragged, setHasDragged] = useState(false);
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
-  
+
   const DRAG_THRESHOLD = 5; // Pixels before considering it a drag
 
   // Scroll to active status when it changes
@@ -161,10 +143,10 @@ export function StatusCards({ statusCounts, activeStatus, onStatusClick, loading
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!isMouseDown || !containerRef.current) return;
-    
+
     const x = e.pageX - containerRef.current.offsetLeft;
     const walk = x - startX;
-    
+
     // Only start dragging if we've moved past the threshold
     if (Math.abs(walk) > DRAG_THRESHOLD) {
       setHasDragged(true);
@@ -190,7 +172,7 @@ export function StatusCards({ statusCounts, activeStatus, onStatusClick, loading
 
   return (
     <div className="mb-6">
-      <div 
+      <div
         ref={containerRef}
         className={cn(
           "flex gap-2 overflow-x-auto pb-2 scrollbar-hide scroll-smooth select-none",
@@ -238,7 +220,7 @@ export function StatusCards({ statusCounts, activeStatus, onStatusClick, loading
           };
           const Icon = config.icon;
           const isActive = activeStatus === status;
-          const label = shortLabels[status] || callTowingStatusLabels[status] || status;
+          const label = shortLabels[status] || status;
 
           return (
             <button

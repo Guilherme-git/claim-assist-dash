@@ -161,7 +161,7 @@ const Index = () => {
                 delay={550}
               />
               <MetricCard
-                title="Atrasos"
+                title="Chamados Atrasados"
                 value={dashboardData.attendancesDelayed?.toString() || "0"}
                 icon={AlertCircle}
                 variant="danger"

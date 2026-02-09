@@ -48,12 +48,13 @@ import { formatPhone, formatDateTime } from "@/lib/utils";
 import {
   atendimentosService,
   type AssociateService,
-  type Pagination
+  type Pagination,
+  type StatusCount
 } from "@/services/atendimentos.service";
 import { ChatModal } from "@/components/atendimentos/ChatModal";
+import { StatusCards } from "@/components/atendimentos/StatusCards";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive"; icon: any }> = {
-  waiting_initial_message: { label: "Aguardando Mensagem Inicial", variant: "secondary", icon: Clock },
   waiting_identification: { label: "Aguardando Identificação", variant: "secondary", icon: AlertCircle },
   waiting_request_reason: { label: "Aguardando Motivo do Pedido", variant: "secondary", icon: AlertCircle },
   answering_service_form: { label: "Respondendo Formulário", variant: "default", icon: Clock },
@@ -62,7 +63,6 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
   waiting_destination_location: { label: "Aguardando Local de Destino", variant: "secondary", icon: MapPin },
   transferred: { label: "Transferido", variant: "default", icon: CheckCircle2 },
   finished: { label: "Finalizado", variant: "outline", icon: CheckCircle2 },
-  finished_with_pending_issues: { label: "Finalizado com Pendências", variant: "destructive", icon: AlertCircle },
 };
 
 const requestReasonLabels: Record<string, string> = {
@@ -86,6 +86,7 @@ export default function Atendimentos() {
   const navigate = useNavigate();
   const [atendimentos, setAtendimentos] = useState<AssociateService[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
+  const [statusCounts, setStatusCounts] = useState<StatusCount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -113,6 +114,7 @@ export default function Atendimentos() {
       });
       setAtendimentos(response.data);
       setPagination(response.pagination);
+      setStatusCounts(response.status_counts || []);
     } catch (err) {
       console.error('Erro ao recarregar atendimentos:', err);
     }
@@ -161,6 +163,7 @@ export default function Atendimentos() {
         });
         setAtendimentos(response.data);
         setPagination(response.pagination);
+        setStatusCounts(response.status_counts || []);
       } catch (err) {
         console.error('Erro ao buscar atendimentos:', err);
         setError('Não foi possível carregar os atendimentos. Verifique se a API está rodando em http://localhost:3001');
@@ -206,6 +209,14 @@ export default function Atendimentos() {
         </div>
       </div>
 
+      {/* Status Cards */}
+      <StatusCards
+        statusCounts={statusCounts}
+        activeStatus={statusFilter}
+        onStatusClick={(status) => applyFilter(setStatusFilter, status)}
+        loading={loading}
+      />
+
       {/* Info de Paginação + Filtros */}
       {pagination && (
         <div className="mb-6 flex items-center gap-3 flex-wrap">
@@ -247,7 +258,6 @@ export default function Atendimentos() {
             </SelectTrigger>
             <SelectContent className="cursor-pointer">
               <SelectItem className="cursor-pointer" value="todos">Todos os Status</SelectItem>
-              <SelectItem className="cursor-pointer" value="waiting_initial_message">Aguardando Mensagem Inicial</SelectItem>
               <SelectItem className="cursor-pointer" value="waiting_identification">Aguardando Identificação</SelectItem>
               <SelectItem className="cursor-pointer" value="waiting_request_reason">Aguardando Motivo do Pedido</SelectItem>
               <SelectItem className="cursor-pointer" value="answering_service_form">Respondendo Formulário</SelectItem>
@@ -256,7 +266,6 @@ export default function Atendimentos() {
               <SelectItem className="cursor-pointer" value="waiting_destination_location">Aguardando Local de Destino</SelectItem>
               <SelectItem className="cursor-pointer" value="transferred">Transferido</SelectItem>
               <SelectItem className="cursor-pointer" value="finished">Finalizado</SelectItem>
-              <SelectItem className="cursor-pointer" value="finished_with_pending_issues">Finalizado com Pendências</SelectItem>
             </SelectContent>
           </Select>
 

@@ -54,6 +54,7 @@ import {
   callsService,
   type Call,
   type Pagination,
+  type StatusCount,
   callTowingStatusLabels,
   callTowingStatusVariants,
   towingServiceTypeLabels,
@@ -74,24 +75,11 @@ const statusIcons: Record<string, any> = {
   cancelled: XCircle,
 };
 
-// Mock de contagem por status (simulando dados da API)
-const mockStatusCounts = [
-  { status: "waiting_driver_accept", count: 12 },
-  { status: "waiting_driver_access_app_after_call_accepted", count: 5 },
-  { status: "waiting_arrival_to_checkin", count: 18 },
-  { status: "in_checking", count: 8 },
-  { status: "waiting_arrival_to_checkout", count: 14 },
-  { status: "in_checkout", count: 6 },
-  { status: "waiting_in_shed", count: 3 },
-  { status: "waiting_add_towing_delivery_call_trip", count: 7 },
-  { status: "finished", count: 156 },
-  { status: "cancelled", count: 23 },
-];
-
 export default function Chamados() {
   const navigate = useNavigate();
   const [chamados, setChamados] = useState<Call[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
+  const [statusCounts, setStatusCounts] = useState<StatusCount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -123,6 +111,7 @@ export default function Chamados() {
       });
       setChamados(response.data);
       setPagination(response.pagination);
+      setStatusCounts(response.status_counts || []);
     } catch (err) {
       console.error('Erro ao buscar chamados:', err);
       setError('Não foi possível carregar os chamados. Verifique se a API está rodando em http://localhost:3001');
@@ -165,81 +154,16 @@ export default function Chamados() {
 
       {/* Status Cards */}
       <StatusCards
-        statusCounts={mockStatusCounts}
+        statusCounts={statusCounts}
         activeStatus={statusFilter}
         onStatusClick={(status) => applyFilter(setStatusFilter, status)}
+        loading={loading}
       />
 
-      {/* Filtros */}
-      <div className="mb-6 flex items-center gap-3 flex-wrap">
-         {/* Filtro de Associação (calls_association) */}
-        <Select value={associationFilter} onValueChange={(v) => applyFilter(setAssociationFilter, v)}>
-          <SelectTrigger className="w-[180px] h-10 rounded-xl">
-            <SelectValue placeholder="Filtrar por Cliente" />
-          </SelectTrigger>
-          <SelectContent className="cursor-pointer">
-            <SelectItem className="cursor-pointer" value="todos">Todos os Clientes</SelectItem>
-            <SelectItem className="cursor-pointer" value="solidy">Solidy</SelectItem>
-            <SelectItem className="cursor-pointer" value="nova">Nova</SelectItem>
-            <SelectItem className="cursor-pointer" value="motoclub">Motoclub</SelectItem>
-            <SelectItem className="cursor-pointer" value="aprovel">AAPROVEL</SelectItem>
-          </SelectContent>
-        </Select>
-        
-        {/* Filtro de Tipo de Serviço */}
-        <Select value={serviceTypeFilter} onValueChange={(v) => applyFilter(setServiceTypeFilter, v)}>
-          <SelectTrigger className="w-[220px] h-10 rounded-xl">
-            <SelectValue placeholder="Filtrar por Serviço" />
-          </SelectTrigger>
-          <SelectContent className="cursor-pointer max-h-[300px]">
-            <SelectItem className="cursor-pointer" value="todos">Todos os Serviços</SelectItem>
-            <SelectItem className="cursor-pointer" value="towing">Reboque</SelectItem>
-            <SelectItem className="cursor-pointer" value="towing_breakdown">Reboque com Falha</SelectItem>
-            <SelectItem className="cursor-pointer" value="battery">Bateria</SelectItem>
-            <SelectItem className="cursor-pointer" value="tire_change">Troca de Pneu</SelectItem>
-            <SelectItem className="cursor-pointer" value="locksmith">Chaveiro</SelectItem>
-            <SelectItem className="cursor-pointer" value="empty_tank">Tanque Vazio</SelectItem>
-            <SelectItem className="cursor-pointer" value="battery_charge_light">Carga de Bateria - Leve</SelectItem>
-            <SelectItem className="cursor-pointer" value="battery_charge_moto">Carga de Bateria - Moto</SelectItem>
-            <SelectItem className="cursor-pointer" value="towing_light">Reboque Leve</SelectItem>
-            <SelectItem className="cursor-pointer" value="towing_moto">Reboque Moto</SelectItem>
-            <SelectItem className="cursor-pointer" value="towing_heavy">Reboque Pesado</SelectItem>
-          </SelectContent>
-        </Select>
-        {/* Botão Limpar Filtros */}
-        {(serviceTypeFilter !== "todos" || associationFilter !== "todos" || statusFilter !== "todos" || searchTerm) && (
-          <Button
-            variant="outline"
-            className="h-10 rounded-xl gap-2"
-            onClick={() => {
-              setServiceTypeFilter("todos");
-              setAssociationFilter("todos");
-              setStatusFilter("todos");
-              setSearchTerm("");
-              setCurrentPage(1);
-            }}
-          >
-            <XCircle className="h-4 w-4" />
-            Limpar
-          </Button>
-        )}
-
-        {/* Ações */}
-        <div className="ml-auto flex gap-3">
-          <Button variant="outline" className="h-10 rounded-xl gap-2">
-            <Download className="h-4 w-4" />
-            Exportar
-          </Button>
-          <Button className="h-10 rounded-xl gap-2" onClick={() => setIsModalOpen(true)}>
-            <Plus className="h-4 w-4" />
-            Novo Chamado
-          </Button>
-        </div>
-      </div>
-
-      {/* Info de Paginação */}
+      {/* Info de Paginação + Filtros */}
       {pagination && (
-        <div className="mb-6">
+        <div className="mb-6 flex items-center gap-3 flex-wrap">
+          {/* Tabs de Info */}
           <Tabs defaultValue="todos" className="mb-0">
             <TabsList className="bg-card border border-border/50 p-1 rounded-xl">
               <TabsTrigger value="todos" className="rounded-lg">
@@ -250,6 +174,91 @@ export default function Chamados() {
               </TabsTrigger>
             </TabsList>
           </Tabs>
+
+          {/* Filtro de Associação */}
+          <Select value={associationFilter} onValueChange={(v) => applyFilter(setAssociationFilter, v)}>
+            <SelectTrigger className="w-[200px] h-10 rounded-xl">
+              <SelectValue placeholder="Filtrar por Cliente" />
+            </SelectTrigger>
+            <SelectContent className="cursor-pointer">
+              <SelectItem className="cursor-pointer" value="todos">Todos os Clientes</SelectItem>
+              <SelectItem className="cursor-pointer" value="solidy">Solidy</SelectItem>
+              <SelectItem className="cursor-pointer" value="nova">Nova</SelectItem>
+              <SelectItem className="cursor-pointer" value="motoclub">Motoclub</SelectItem>
+              <SelectItem className="cursor-pointer" value="aprovel">AAPROVEL</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Filtro de Tipo de Serviço */}
+          <Select value={serviceTypeFilter} onValueChange={(v) => applyFilter(setServiceTypeFilter, v)}>
+            <SelectTrigger className="w-[280px] h-10 rounded-xl">
+              <SelectValue placeholder="Filtrar por Serviço" />
+            </SelectTrigger>
+            <SelectContent className="cursor-pointer max-h-[300px]">
+              <SelectItem className="cursor-pointer" value="todos">Todos os Serviços</SelectItem>
+              <SelectItem className="cursor-pointer" value="towing">Reboque</SelectItem>
+              <SelectItem className="cursor-pointer" value="towing_breakdown">Reboque com Falha</SelectItem>
+              <SelectItem className="cursor-pointer" value="battery">Bateria</SelectItem>
+              <SelectItem className="cursor-pointer" value="tire_change">Troca de Pneu</SelectItem>
+              <SelectItem className="cursor-pointer" value="locksmith">Chaveiro</SelectItem>
+              <SelectItem className="cursor-pointer" value="empty_tank">Tanque Vazio</SelectItem>
+              <SelectItem className="cursor-pointer" value="battery_charge_light">Carga de Bateria - Leve</SelectItem>
+              <SelectItem className="cursor-pointer" value="battery_charge_moto">Carga de Bateria - Moto</SelectItem>
+              <SelectItem className="cursor-pointer" value="towing_light">Reboque Leve</SelectItem>
+              <SelectItem className="cursor-pointer" value="towing_moto">Reboque Moto</SelectItem>
+              <SelectItem className="cursor-pointer" value="towing_heavy">Reboque Pesado</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Filtro de Status */}
+          <Select value={statusFilter} onValueChange={(v) => applyFilter(setStatusFilter, v)}>
+            <SelectTrigger className="w-[280px] h-10 rounded-xl">
+              <SelectValue placeholder="Filtrar por Status" />
+            </SelectTrigger>
+            <SelectContent className="cursor-pointer max-h-[300px]">
+              <SelectItem className="cursor-pointer" value="todos">Todos os Status</SelectItem>
+              <SelectItem className="cursor-pointer" value="waiting_driver_accept">Aguardando Aceite</SelectItem>
+              <SelectItem className="cursor-pointer" value="waiting_driver_access_app_after_call_accepted">Aguardando App</SelectItem>
+              <SelectItem className="cursor-pointer" value="waiting_arrival_to_checkin">A caminho (Checkin)</SelectItem>
+              <SelectItem className="cursor-pointer" value="in_checking">Em Checkin</SelectItem>
+              <SelectItem className="cursor-pointer" value="waiting_arrival_to_checkout">A caminho (Checkout)</SelectItem>
+              <SelectItem className="cursor-pointer" value="in_checkout">Em Checkout</SelectItem>
+              <SelectItem className="cursor-pointer" value="waiting_in_shed">Na Garagem</SelectItem>
+              <SelectItem className="cursor-pointer" value="waiting_add_towing_delivery_call_trip">Aguardando Viagem</SelectItem>
+              <SelectItem className="cursor-pointer" value="finished">Finalizados</SelectItem>
+              <SelectItem className="cursor-pointer" value="cancelled">Cancelados</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Botão Limpar Filtros */}
+          {(serviceTypeFilter !== "todos" || associationFilter !== "todos" || statusFilter !== "todos" || searchTerm) && (
+            <Button
+              variant="outline"
+              className="h-10 rounded-xl gap-2"
+              onClick={() => {
+                setServiceTypeFilter("todos");
+                setAssociationFilter("todos");
+                setStatusFilter("todos");
+                setSearchTerm("");
+                setCurrentPage(1);
+              }}
+            >
+              <XCircle className="h-4 w-4" />
+              Limpar
+            </Button>
+          )}
+
+          {/* Ações */}
+          <div className="ml-auto flex gap-3">
+            <Button variant="outline" className="h-10 rounded-xl gap-2">
+              <Download className="h-4 w-4" />
+              Exportar
+            </Button>
+            <Button className="h-10 rounded-xl gap-2" onClick={() => setIsModalOpen(true)}>
+              <Plus className="h-4 w-4" />
+              Novo Chamado
+            </Button>
+          </div>
         </div>
       )}
 
