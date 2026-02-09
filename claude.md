@@ -60,6 +60,151 @@ Este projeto front-end é **EXCLUSIVAMENTE** para gerenciamento de **GUINCHOS**.
 ### **Utilitários**
 - **date-fns** 3.6.0 - Manipulação de datas
 - **clsx** 2.1.1 - Composição de classes CSS
+- **react-currency-input-field** 3.8.0 - Máscaras de entrada para valores monetários
+
+---
+
+## 🐳 AMBIENTE DOCKER
+
+### **Arquitetura do Projeto**
+
+O frontend roda **DENTRO de um container Docker**, não diretamente na máquina host.
+
+**Estrutura:**
+```
+Host Machine: /var/www/utiliza/utiliza-front-assistencia/
+    ↓ Volume montado em ↓
+Docker Container: /app/
+    ↓ Vite dev server roda aqui ↓
+http://localhost:8080
+```
+
+**Container:**
+- **Nome:** `utiliza-front-assistencia-app-1`
+- **Imagem:** `utiliza-front-assistencia-app`
+- **Porta:** `8080:8080`
+- **Working Directory:** `/app`
+- **Node Modules:** `/app/node_modules` (DENTRO do container)
+
+### **⚠️ INSTALAÇÃO DE PACOTES NPM - IMPORTANTE!**
+
+#### **❌ ERRADO - Instalar no Host**
+
+```bash
+# ❌ NÃO FAÇA ISSO! Instala na máquina host
+cd /var/www/utiliza/utiliza-front-assistencia
+npm install react-currency-input-field
+
+# Resultado: Pacote instalado em:
+# /var/www/utiliza/utiliza-front-assistencia/node_modules/
+# ❌ Mas o Vite procura em: /app/node_modules/ (container)
+# ❌ Erro: "Failed to resolve import"
+```
+
+#### **✅ CORRETO - Instalar no Container**
+
+```bash
+# ✅ SEMPRE USE ESTE COMANDO!
+docker exec utiliza-front-assistencia-app-1 npm install react-currency-input-field
+
+# Resultado: Pacote instalado em:
+# /app/node_modules/ (dentro do container)
+# ✅ Vite encontra o pacote corretamente
+# ✅ Hot reload automático, sem necessidade de reiniciar
+```
+
+### **Comandos Docker Úteis**
+
+#### **Verificar Containers Rodando**
+```bash
+docker ps | grep front
+# Saída esperada:
+# utiliza-front-assistencia-app-1
+```
+
+#### **Instalar Dependência**
+```bash
+docker exec utiliza-front-assistencia-app-1 npm install <package-name>
+```
+
+#### **Desinstalar Dependência**
+```bash
+docker exec utiliza-front-assistencia-app-1 npm uninstall <package-name>
+```
+
+#### **Ver Logs do Container**
+```bash
+docker logs utiliza-front-assistencia-app-1 -f
+```
+
+#### **Acessar Shell do Container**
+```bash
+docker exec -it utiliza-front-assistencia-app-1 sh
+```
+
+#### **Reiniciar Container**
+```bash
+docker restart utiliza-front-assistencia-app-1
+```
+
+### **Por Que Este Setup?**
+
+1. **Isolamento:** Dependências isoladas do sistema host
+2. **Consistência:** Mesmo ambiente em dev/staging/prod
+3. **Node Modules:** Evita conflitos entre host e container
+4. **Hot Reload:** Vite detecta mudanças nos arquivos montados por volume
+5. **Segurança:** Container não afeta o sistema host
+
+### **Fluxo de Trabalho Correto**
+
+```bash
+# 1. Editar código no host
+vim /var/www/utiliza/utiliza-front-assistencia/src/components/MyComponent.tsx
+
+# 2. Vite hot-reload automático (funciona via volume mount)
+
+# 3. Instalar nova dependência - SEMPRE no container!
+docker exec utiliza-front-assistencia-app-1 npm install <package>
+
+# 4. Container hot-reload automático após npm install
+# Não precisa reiniciar manualmente!
+```
+
+### **Troubleshooting**
+
+#### **Erro: "Failed to resolve import"**
+
+**Causa:** Pacote instalado no host, não no container
+
+**Solução:**
+```bash
+# Instalar no container
+docker exec utiliza-front-assistencia-app-1 npm install <package-name>
+
+# Verificar se instalou
+docker exec utiliza-front-assistencia-app-1 ls /app/node_modules/<package-name>
+```
+
+#### **Dev Server Não Inicia**
+
+```bash
+# Ver logs
+docker logs utiliza-front-assistencia-app-1 -f
+
+# Reiniciar container
+docker restart utiliza-front-assistencia-app-1
+```
+
+#### **Porta 8080 Não Responde**
+
+```bash
+# Verificar se container está rodando
+docker ps | grep front
+
+# Verificar mapeamento de portas
+docker port utiliza-front-assistencia-app-1
+# Esperado: 8080/tcp -> 0.0.0.0:8080
+```
 
 ---
 
@@ -7554,4 +7699,880 @@ WHERE b.status = 'paid'
 - 4 boletos foram pagos
 
 **⚠️ Importante:** Usa `payment_date` (quando foi pago), não `created_at` (quando foi criado). Boletos criados no período mas pagos depois não são contabilizados.
+
+---
+
+## **⚙️ Configurações de Guincho por Estado**
+
+### **Visão Geral**
+
+A funcionalidade de **Configurações de Guincho** permite gerenciar os valores de serviços de guincho para cada estado (UF) do Brasil. Os valores configurados incluem:
+- **Preço por KM Excedente:** Valor cobrado por cada quilômetro adicional além do limite
+- **Preço de Partida:** Valor fixo cobrado ao iniciar o serviço
+
+### **Localização**
+
+**Página:** `/config` → Tab "Config. Guincheiro"
+
+**Arquivos:**
+- `src/pages/Configuracoes.tsx` - Página principal de configurações
+- `src/components/configuracoes/TowingSettingsTab.tsx` - Componente da tab de guincho
+- `src/services/towingSettings.service.ts` - Service para consumir a API
+
+### **Endpoints da API**
+
+#### **1. Listar Configurações**
+
+**URL:** `GET /api/towing-settings`
+
+**Headers:**
+```
+Authorization: Bearer {token}
+```
+
+**Resposta:**
+```json
+{
+  "total": 2,
+  "data": [
+    {
+      "id": 5,
+      "uf": {
+        "id": 14,
+        "code": "AL",
+        "name": "Alagoas"
+      },
+      "excess_km_price": 3.2,
+      "departure_price": 140,
+      "created_at": null,
+      "updated_at": null
+    },
+    {
+      "id": 1,
+      "uf": {
+        "id": 20,
+        "code": "SP",
+        "name": "São Paulo"
+      },
+      "excess_km_price": 3.4,
+      "departure_price": 145,
+      "created_at": "2026-02-09T16:30:24.000Z",
+      "updated_at": "2026-02-09T16:30:24.000Z"
+    }
+  ]
+}
+```
+
+#### **2. Criar Nova Configuração**
+
+**URL:** `POST /api/towing-settings`
+
+**Headers:**
+```
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+**Body:**
+```json
+{
+  "uf_id": 14,
+  "excess_km_price": 3.20,
+  "departure_price": 140.00
+}
+```
+
+**Resposta:**
+```json
+{
+  "message": "Configuração criada com sucesso",
+  "data": {
+    "id": 5,
+    "uf": {
+      "id": 14,
+      "code": "AL",
+      "name": "Alagoas"
+    },
+    "excess_km_price": 3.2,
+    "departure_price": 140,
+    "created_at": null,
+    "updated_at": null
+  }
+}
+```
+
+#### **3. Atualizar Configuração**
+
+**URL:** `PUT /api/towing-settings/:id`
+
+**Headers:**
+```
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+**Body:**
+```json
+{
+  "excess_km_price": 3.40,
+  "departure_price": 145.00
+}
+```
+
+**Resposta:**
+```json
+{
+  "excess_km_price": 3.40,
+  "departure_price": 145.00
+}
+```
+
+**Observação:** O `uf_id` não pode ser alterado após a criação. Para alterar o estado, é necessário excluir e criar novamente.
+
+#### **4. Excluir Configuração**
+
+**URL:** `DELETE /api/towing-settings/:id`
+
+**Headers:**
+```
+Authorization: Bearer {token}
+```
+
+**Resposta:** Status 204 (No Content)
+
+#### **5. Buscar por ID**
+
+**URL:** `GET /api/towing-settings/:id`
+
+**Headers:**
+```
+Authorization: Bearer {token}
+```
+
+**Resposta:** Objeto `TowingSetting` único
+
+### **Interfaces TypeScript**
+
+```typescript
+export interface UF {
+  id: number;
+  code: string;
+  name: string;
+}
+
+export interface TowingSetting {
+  id: number;
+  uf: UF;
+  excess_km_price: number;
+  departure_price: number;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface TowingSettingsResponse {
+  total: number;
+  data: TowingSetting[];
+}
+
+export interface CreateTowingSettingPayload {
+  uf_id: number;
+  excess_km_price: number;
+  departure_price: number;
+}
+
+export interface UpdateTowingSettingPayload {
+  excess_km_price: number;
+  departure_price: number;
+}
+```
+
+### **Funcionalidades da Interface**
+
+#### **Tabela de Listagem**
+- Exibe todas as configurações cadastradas
+- Colunas: Estado (UF), Preço por KM Excedente, Preço de Partida, Ações
+- Ícones: MapPin (estado), DollarSign (valores)
+- Loading state com spinner
+- Empty state quando não há configurações
+
+#### **Dialog de Criar/Editar**
+- **Criar:** Permite selecionar UF e preencher valores
+- **Editar:** UF fica desabilitado, permite apenas editar valores
+- **Validações:**
+  - Todos os campos obrigatórios
+  - Valores numéricos com 2 casas decimais
+  - Valores mínimos: 0
+- **Feedback:** Toast notifications para sucesso/erro
+
+#### **Máscaras de Entrada (Input Masks)**
+
+Os campos de preço utilizam a biblioteca **react-currency-input-field** para formatação monetária brasileira:
+
+**⚠️ INSTALAÇÃO - IMPORTANTE!**
+
+Como o frontend roda em **Docker**, o pacote DEVE ser instalado **dentro do container**:
+
+```bash
+# ✅ CORRETO - Instalar no container Docker
+docker exec utiliza-front-assistencia-app-1 npm install react-currency-input-field
+
+# ❌ ERRADO - Não instalar no host
+# npm install react-currency-input-field
+# Isso causará erro: "Failed to resolve import"
+```
+
+**Versão Instalada:** `3.8.0`
+
+**Configuração dos Campos de Preço:**
+```typescript
+import CurrencyInput from "react-currency-input-field";
+
+<CurrencyInput
+  id="excess_km_price"
+  name="excess_km_price"
+  placeholder="R$ 3,40"
+  decimalsLimit={2}              // Máximo 2 casas decimais
+  decimalSeparator=","           // Vírgula para decimal (padrão BR)
+  groupSeparator="."             // Ponto para milhar (padrão BR)
+  prefix="R$ "                   // Prefixo Real brasileiro
+  value={formData.excess_km_price}
+  onValueChange={(value) =>
+    setFormData({ ...formData, excess_km_price: value || "" })
+  }
+  className="flex h-10 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+  required
+/>
+```
+
+**Formato de Entrada:**
+- Usuário digita: `340` → Exibe: `R$ 3,40`
+- Usuário digita: `14500` → Exibe: `R$ 145,00`
+- Usuário digita: `1234567` → Exibe: `R$ 12.345,67`
+
+**Conversão para API:**
+```typescript
+// Ao enviar para API, converte string → number
+const payload = {
+  excess_km_price: parseFloat(formData.excess_km_price),  // "3.40" → 3.4
+  departure_price: parseFloat(formData.departure_price)   // "145.00" → 145
+};
+```
+
+**Comportamento da Máscara:**
+- ✅ Formatação em tempo real durante a digitação
+- ✅ Aceita apenas números (bloqueia letras automaticamente)
+- ✅ Formata automaticamente com separadores brasileiros
+- ✅ Permite copiar/colar valores
+- ✅ Backspace funciona normalmente
+- ✅ Suporta seleção de texto
+
+**Armazenamento de Dados:**
+- Valor interno mantido como **string** (ex: "3.40")
+- Evita perda de precisão com decimais
+- Conversão para **number** apenas no submit
+- API recebe valores numéricos (ex: `3.4`, `145`)
+
+**Troubleshooting:**
+
+| Problema | Causa | Solução |
+|----------|-------|---------|
+| `Failed to resolve import "react-currency-input-field"` | Pacote instalado no host, não no container | `docker exec utiliza-front-assistencia-app-1 npm install react-currency-input-field` |
+| Máscara não formata | Componente não importado corretamente | Verificar import: `import CurrencyInput from "react-currency-input-field"` |
+| Valor não salva | Conversão incorreta para number | Usar `parseFloat(value)` antes de enviar para API |
+| Formato americano (US) ao invés de BR | Separadores configurados errados | Verificar: `decimalSeparator=","` e `groupSeparator="."` |
+
+**Hot Reload Automático:**
+- Após `docker exec ... npm install`, o Vite detecta automaticamente
+- Não precisa reiniciar o container manualmente
+- Aguarde ~5 segundos para hot reload completar
+
+#### **Ações**
+- **Nova Configuração:** Botão no header do card
+- **Editar:** Ícone de lápis na linha da tabela
+- **Excluir:** Ícone de lixeira → **AlertDialog de confirmação visual**
+
+**AlertDialog de Exclusão:**
+```typescript
+// Componente: AlertDialog do shadcn/ui
+// Exibe ao clicar no botão de excluir
+<AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+  <AlertDialogContent>
+    <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+    <AlertDialogDescription>
+      Tem certeza que deseja excluir a configuração de
+      <strong>{estado.name} ({estado.code})</strong>?
+      Esta ação não poderá ser desfeita.
+    </AlertDialogDescription>
+    <AlertDialogFooter>
+      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+      <AlertDialogAction onClick={handleDeleteConfirm}>
+        Excluir
+      </AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>
+```
+
+**Fluxo de Exclusão:**
+1. Usuário clica no ícone de lixeira
+2. AlertDialog abre mostrando o estado a ser excluído
+3. Botões: "Cancelar" (outline) e "Excluir" (vermelho/destructive)
+4. Se confirmar → DELETE para API → Toast de sucesso → Recarrega lista
+5. Se cancelar → Fecha o dialog sem fazer nada
+
+### **Lista de Estados (UFs)**
+
+27 estados brasileiros + DF disponíveis no dropdown:
+- AC (Acre), AL (Alagoas), AP (Amapá), AM (Amazonas)
+- BA (Bahia), CE (Ceará), DF (Distrito Federal), ES (Espírito Santo)
+- GO (Goiás), MA (Maranhão), MT (Mato Grosso), MS (Mato Grosso do Sul)
+- MG (Minas Gerais), PA (Pará), PB (Paraíba), PR (Paraná)
+- PE (Pernambuco), PI (Piauí), RJ (Rio de Janeiro), RN (Rio Grande do Norte)
+- RS (Rio Grande do Sul), RO (Rondônia), RR (Roraima), SC (Santa Catarina)
+- SP (São Paulo), SE (Sergipe), TO (Tocantins)
+
+### **Fluxo de Uso**
+
+#### **Criar Nova Configuração:**
+```
+1. Usuário acessa /config
+2. Clica na tab "Config. Guincheiro"
+3. Clica em "Nova Configuração"
+4. Preenche:
+   - Seleciona Estado (UF)
+   - Preço por KM Excedente: 3.40
+   - Preço de Partida: 145.00
+5. Clica em "Salvar"
+6. POST /api/towing-settings
+7. Toast de sucesso
+8. Lista atualizada
+```
+
+#### **Editar Configuração Existente:**
+```
+1. Usuário localiza configuração na tabela
+2. Clica no ícone de editar (lápis)
+3. Dialog abre com dados preenchidos
+4. Campo UF está desabilitado
+5. Altera valores:
+   - Preço por KM: 3.50
+   - Preço de Partida: 150.00
+6. Clica em "Salvar"
+7. PUT /api/towing-settings/5
+8. Toast de sucesso
+9. Lista atualizada
+```
+
+#### **Excluir Configuração:**
+```
+1. Usuário clica no ícone de excluir (lixeira)
+2. AlertDialog abre mostrando:
+   - Título: "Confirmar Exclusão"
+   - Descrição: "Tem certeza que deseja excluir a configuração de [Estado]?"
+   - Aviso: "Esta ação não poderá ser desfeita."
+   - Botões: "Cancelar" | "Excluir"
+3. Se clicar em "Excluir":
+   - DELETE /api/towing-settings/5
+   - Toast de sucesso
+   - Lista atualizada
+   - Dialog fecha
+4. Se clicar em "Cancelar":
+   - Dialog fecha sem fazer nada
+```
+
+### **Validações e Regras de Negócio**
+
+#### **Criação:**
+- ✅ Todos os campos obrigatórios
+- ✅ Estado (UF) deve ser único (não pode ter duas configs para o mesmo estado)
+- ✅ Valores numéricos > 0
+- ✅ Precisão: 2 casas decimais
+
+#### **Edição:**
+- ✅ Não permite alterar o estado (uf_id)
+- ✅ Valores numéricos > 0
+- ✅ Precisão: 2 casas decimais
+
+#### **Exclusão:**
+- ✅ Requer confirmação do usuário
+- ✅ Soft delete ou hard delete (depende do backend)
+
+### **Tratamento de Erros**
+
+#### **Erro 401 - Não Autorizado**
+```json
+{
+  "error": "Não autorizado. Token obrigatório."
+}
+```
+**Ação:** Redireciona para login
+
+#### **Erro 400 - Validação**
+```json
+{
+  "error": "Estado já possui configuração cadastrada"
+}
+```
+**Ação:** Toast com mensagem de erro
+
+#### **Erro 500 - Servidor**
+```json
+{
+  "error": "Failed to fetch towing settings"
+}
+```
+**Ação:** Toast genérico de erro
+
+### **Exemplos de Uso da API**
+
+#### **Exemplo 1: Criar configuração para SP**
+```bash
+curl -X POST http://localhost:3001/api/towing-settings \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "uf_id": 25,
+    "excess_km_price": 3.50,
+    "departure_price": 150.00
+  }'
+```
+
+#### **Exemplo 2: Atualizar valores de AL**
+```bash
+curl -X PUT http://localhost:3001/api/towing-settings/5 \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "excess_km_price": 3.60,
+    "departure_price": 155.00
+  }'
+```
+
+#### **Exemplo 3: Listar todas as configurações**
+```bash
+curl -X GET http://localhost:3001/api/towing-settings \
+  -H "Authorization: Bearer {token}"
+```
+
+### **📋 Resumo Rápido - Config. Guincheiro**
+
+#### **Comandos Essenciais**
+
+```bash
+# 1️⃣ Instalar dependência de máscaras (NO CONTAINER!)
+docker exec utiliza-front-assistencia-app-1 npm install react-currency-input-field
+
+# 2️⃣ Verificar se instalou
+docker exec utiliza-front-assistencia-app-1 ls /app/node_modules/react-currency-input-field
+
+# 3️⃣ Ver logs em tempo real
+docker logs utiliza-front-assistencia-app-1 -f
+```
+
+#### **Arquivos da Feature**
+
+| Arquivo | Localização | Descrição |
+|---------|-------------|-----------|
+| Service | `src/services/towingSettings.service.ts` | CRUD API calls |
+| Component | `src/components/configuracoes/TowingSettingsTab.tsx` | Interface e lógica |
+| Page | `src/pages/Configuracoes.tsx` | Container com tabs |
+
+#### **Endpoints API**
+
+| Método | Endpoint | Payload |
+|--------|----------|---------|
+| GET | `/api/towing-settings` | - |
+| GET | `/api/towing-settings/:id` | - |
+| POST | `/api/towing-settings` | `{ uf_id, excess_km_price, departure_price }` |
+| PUT | `/api/towing-settings/:id` | `{ excess_km_price, departure_price }` |
+| DELETE | `/api/towing-settings/:id` | - |
+
+#### **Formato de Dados**
+
+```typescript
+// Request (POST/PUT)
+{
+  uf_id: 25,                    // Apenas no POST
+  excess_km_price: 3.40,        // Number
+  departure_price: 145.00       // Number
+}
+
+// Response
+{
+  id: 1,
+  uf: { id: 25, code: "SP", name: "São Paulo" },
+  excess_km_price: 3.4,         // Number
+  departure_price: 145,         // Number
+  created_at: "2026-02-09...",
+  updated_at: "2026-02-09..."
+}
+```
+
+#### **Checklist de Implementação**
+
+- [x] Service layer com TypeScript tipado
+- [x] Interface de listagem com tabela
+- [x] Dialog de criar/editar
+- [x] Validações de formulário
+- [x] Máscaras de entrada monetária (BR)
+- [x] Toast notifications
+- [x] Loading states
+- [x] Empty states
+- [x] AlertDialog de confirmação de exclusão (visual)
+- [x] UF não editável no update
+- [x] 27 estados + DF disponíveis
+- [x] Hot reload automático (Docker)
+
+#### **Como Testar**
+
+1. **Acesse:** http://localhost:8080/config
+2. **Tab:** "Config. Guincheiro"
+3. **Criar:**
+   - Clique "Nova Configuração"
+   - Selecione UF (ex: SP)
+   - Digite valores: `340` → `R$ 3,40` | `14500` → `R$ 145,00`
+   - Clique "Salvar"
+4. **Editar:**
+   - Clique no ícone de lápis
+   - Altere valores
+   - Salvar
+5. **Excluir:**
+   - Clique no ícone de lixeira
+   - Confirme
+
+---
+
+## **👷 Gestão de Prestadores (Motoristas de Guincho)**
+
+### **Visão Geral**
+
+A página de **Prestadores** exibe todos os motoristas de guincho cadastrados no sistema, com informações detalhadas sobre cada prestador, incluindo empresa, status, histórico de chamados e configurações de valores.
+
+### **Localização**
+
+**Página:** `/prestadores`
+
+**Arquivos:**
+- `src/pages/Prestadores.tsx` - Página principal com tabela
+- `src/services/towingDrivers.service.ts` - Service para consumir a API
+
+### **Endpoints da API**
+
+#### **GET /api/towing-drivers**
+
+**URL:** `GET http://localhost:3001/api/towing-drivers`
+
+**Headers:**
+```
+Authorization: Bearer {token}
+```
+
+**Query Parameters:**
+```typescript
+{
+  page?: number;          // Página atual (default: 1)
+  limit?: number;         // Itens por página (default: 10)
+  search?: string;        // Busca por nome (name) ou empresa (fantasy_name)
+  status?: string;        // Filtro por status: 'available', 'in_service', 'banned'
+  uf_id?: number;         // Filtro por estado (UF)
+}
+```
+
+**Resposta:**
+```json
+{
+  "data": [
+    {
+      "id": 380,
+      "name": "992107766",
+      "cpf": "398.054.468-08",
+      "phone": "(16) 99210-7766",
+      "status": "in_service",
+      "towing_provider": {
+        "id": 464,
+        "fantasy_name": "auto socorro estradeiro"
+      },
+      "total_calls": 1,
+      "uf": {
+        "id": 20,
+        "code": "SP",
+        "name": "São Paulo"
+      },
+      "towing_settings": {
+        "id": 1,
+        "excess_km_price": 3.4,
+        "departure_price": 145
+      },
+      "created_at": "2025-08-29T13:58:06.000Z"
+    }
+  ],
+  "pagination": {
+    "total": 530,
+    "current_page": 1,
+    "per_page": 10,
+    "last_page": 53,
+    "from": 1,
+    "to": 10
+  }
+}
+```
+
+### **Estrutura de Dados**
+
+```typescript
+export interface TowingDriver {
+  id: number;
+  name: string;
+  cpf: string;
+  phone: string;
+  status: 'available' | 'in_service' | 'banned';
+  towing_provider: {
+    id: number;
+    fantasy_name: string;
+  };
+  total_calls: number;
+  uf: {
+    id: number;
+    code: string;
+    name: string;
+  } | null;
+  towing_settings: {
+    id: number;
+    excess_km_price: number;
+    departure_price: number;
+  } | null;
+  created_at: string;
+}
+```
+
+### **Funcionalidades da Interface**
+
+#### **Cards de Estatísticas**
+
+Exibe métricas em tempo real baseadas nos dados carregados:
+
+1. **Total Prestadores:** Contador total de prestadores cadastrados
+2. **Disponíveis:** Número de prestadores com status `available`
+3. **Em Serviço:** Número de prestadores com status `in_service`
+4. **Total de Chamados:** Soma de todos os `total_calls` dos prestadores
+
+#### **Filtros e Busca**
+
+**Card de Filtros:**
+- **Campo de Busca:**
+  - Busca em tempo real (debounce de 500ms)
+  - Busca por nome do motorista ou nome fantasia da empresa
+  - Atualiza automaticamente conforme digita
+  - Ícone de lupa à esquerda
+  - Sem botão "Buscar" (igual página de Chamados)
+
+- **Filtro de Status:**
+  - Dropdown com opções:
+    - Todos os Status
+    - Disponível
+    - Em Serviço
+    - Banido
+  - Atualiza automaticamente ao mudar
+
+#### **Tabela de Listagem**
+
+**Colunas:**
+
+| Coluna | Descrição | Ícone |
+|--------|-----------|-------|
+| **Nome** | Nome do motorista com ícone de caminhão | 🚚 Truck |
+| **CPF** | CPF formatado (font monospace) | - |
+| **Telefone** | Telefone formatado | 📞 Phone |
+| **Empresa** | Nome fantasia do prestador | 🏢 Building2 |
+| **UF** | Código do estado (badge) | 📍 MapPin |
+| **Status** | Badge colorido com status | - |
+| **Chamados** | Total de chamados realizados | - |
+| **Preço/KM** | Preço por KM excedente (R$) | - |
+| **Partida** | Preço de partida do serviço (R$) | - |
+
+**Status (Badges):**
+
+```typescript
+{
+  available: {
+    label: "Disponível",
+    className: "bg-success/15 text-success border-success/20"
+  },
+  in_service: {
+    label: "Em Serviço",
+    className: "bg-warning/15 text-warning border-warning/20"
+  },
+  banned: {
+    label: "Banido",
+    className: "bg-destructive/15 text-destructive border-destructive/20"
+  }
+}
+```
+
+**Exibição de Valores:**
+
+Duas colunas separadas:
+- **Preço/KM:** R$ 3,40 ← `towing_settings.excess_km_price`
+- **Partida:** R$ 145,00 ← `towing_settings.departure_price`
+
+Se `towing_settings` for `null`, ambas exibem `-`
+
+#### **Paginação**
+
+- **Informações:** "Mostrando X a Y de Z resultados"
+- **Navegação:**
+  - Botão "Anterior" (desabilitado na primeira página)
+  - Números das páginas clicáveis (máximo 5 visíveis + primeira e última)
+  - Reticências (...) quando há muitas páginas
+  - Botão "Próxima" (desabilitado na última página)
+- **Página Atual:** Destacada com variant="default" (cor primária)
+- **Exibição:** Aparece apenas se `last_page > 1`
+
+**Exemplo visual:**
+```
+[Anterior] [1] ... [5] 6 [7] [8] [9] ... [53] [Próxima]
+           └─────────────────┬─────────────────┘
+                      Página 6 está ativa
+```
+
+#### **Estados da Interface**
+
+1. **Loading:** Spinner centralizado durante carregamento
+2. **Empty:** Ícone de caminhão + mensagem quando não há resultados
+3. **Populated:** Tabela com dados
+
+### **Fluxo de Uso**
+
+```
+1. Usuário acessa /prestadores
+2. Sistema carrega dados da API (página 1, 10 itens)
+3. Cards de estatísticas são atualizados
+4. Tabela é populada
+
+--- Busca ---
+5. Usuário digita "João" no campo de busca
+6. Aguarda 500ms (debounce)
+7. currentPage reseta para 1
+8. API é chamada automaticamente com param search="João"
+9. Tabela atualizada com resultados em tempo real
+
+--- Filtro por Status ---
+10. Usuário seleciona "Disponível" no dropdown
+11. API é chamada automaticamente com status="available"
+12. Tabela atualizada
+
+--- Paginação ---
+13. Usuário clica em "Próxima"
+14. currentPage incrementa
+15. API é chamada com page=2
+16. Tabela atualizada
+```
+
+### **Tratamento de Erros**
+
+```typescript
+try {
+  const response = await towingDriversService.getAll(params);
+  // Sucesso
+} catch (error) {
+  toast({
+    title: "Erro",
+    description: "Não foi possível carregar os prestadores",
+    variant: "destructive",
+  });
+}
+```
+
+### **Exemplo de Requisição**
+
+#### **Buscar prestadores disponíveis (página 1)**
+
+```bash
+curl -X GET "http://localhost:3001/api/towing-drivers?page=1&limit=10&status=available" \
+  -H "Authorization: Bearer {token}"
+```
+
+#### **Buscar por nome ou empresa**
+
+```bash
+curl -X GET "http://localhost:3001/api/towing-drivers?search=joao" \
+  -H "Authorization: Bearer {token}"
+```
+
+#### **Busca completa com filtros**
+
+```bash
+curl -X GET "http://localhost:3001/api/towing-drivers?status=available&search=joao&page=1&limit=20" \
+  -H "Authorization: Bearer {token}"
+```
+
+### **📋 Resumo Rápido - Prestadores**
+
+#### **Arquivos da Feature**
+
+| Arquivo | Localização | Descrição |
+|---------|-------------|-----------|
+| Service | `src/services/towingDrivers.service.ts` | API calls para motoristas |
+| Page | `src/pages/Prestadores.tsx` | Tabela e interface |
+
+#### **Colunas da Tabela**
+
+1. Nome (com ícone)
+2. CPF (font mono)
+3. Telefone (com ícone)
+4. Empresa (com ícone)
+5. UF (badge)
+6. Status (badge colorido)
+7. Chamados (número)
+8. Preço/KM (R$)
+9. Partida (R$)
+
+#### **Filtros Disponíveis**
+
+- ✅ Busca por texto (nome ou nome fantasia)
+- ✅ Filtro por status (disponível, em serviço, banido)
+- ✅ Paginação (10 por página)
+
+#### **Checklist de Implementação**
+
+- [x] Service layer TypeScript tipado
+- [x] Interface em tabela responsiva
+- [x] Cards de estatísticas dinâmicas
+- [x] Busca em tempo real com debounce (500ms)
+- [x] Filtro por status com dropdown
+- [x] Paginação com números de páginas
+- [x] Loading states
+- [x] Empty states
+- [x] Toast notifications de erro
+- [x] Badges de status coloridos
+- [x] Exibição de valores monetários (2 colunas)
+- [x] Scroll horizontal na tabela
+
+#### **Como Testar**
+
+1. **Acesse:** http://localhost:8080/prestadores
+2. **Verificar:** Cards de estatísticas no topo
+3. **Buscar em Tempo Real:**
+   - Digite "João" no campo de busca
+   - Aguarde 500ms
+   - Tabela atualiza automaticamente
+4. **Filtrar:**
+   - Selecione "Disponível" no dropdown de status
+   - Tabela atualiza automaticamente
+5. **Navegar:**
+   - Clique nos números das páginas (1, 2, 3...)
+   - Use botões "Anterior" e "Próxima"
+   - Observe a página atual destacada em verde
+
+---
+
+### **Melhorias Futuras - Config. Guincheiro**
+
+- [ ] Filtro por estado (UF) na tabela
+- [ ] Paginação para grandes volumes
+- [ ] Importação/Exportação em massa (CSV/Excel)
+- [ ] Histórico de alterações de valores
+- [ ] Validação de valores mínimos/máximos configuráveis
+- [ ] Configurações por cidade (além de estado)
+- [ ] Diferentes valores por tipo de veículo
 

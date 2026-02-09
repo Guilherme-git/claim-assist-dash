@@ -20,11 +20,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { 
-  Building, 
-  Bell, 
-  Shield, 
-  Palette, 
+import {
+  Building,
+  Bell,
+  Shield,
+  Palette,
   Globe,
   Mail,
   Phone,
@@ -33,15 +33,17 @@ import {
   Upload,
   Moon,
   Sun,
-  Volume2
+  Volume2,
+  Truck
 } from "lucide-react";
+import { TowingSettingsTab } from "@/components/configuracoes/TowingSettingsTab";
 
 export default function Configuracoes() {
   return (
     <DashboardLayout title="Configurações" subtitle="Personalize as configurações do sistema">
-      <Tabs defaultValue="empresa" className="space-y-6">
+      <Tabs defaultValue="guincheiro" className="space-y-6">
         <TabsList className="bg-card border border-border/50 p-1 rounded-xl flex-wrap h-auto gap-1">
-          <TabsTrigger value="empresa" className="rounded-lg gap-2">
+          {/* <TabsTrigger value="empresa" className="rounded-lg gap-2">
             <Building className="h-4 w-4" />
             Empresa
           </TabsTrigger>
@@ -60,11 +62,15 @@ export default function Configuracoes() {
           <TabsTrigger value="integracoes" className="rounded-lg gap-2">
             <Globe className="h-4 w-4" />
             Integrações
+          </TabsTrigger> */}
+          <TabsTrigger value="guincheiro" className="rounded-lg gap-2">
+            <Truck className="h-4 w-4" />
+            Config. Guincheiro
           </TabsTrigger>
         </TabsList>
 
         {/* Empresa */}
-        <TabsContent value="empresa">
+        {/* <TabsContent value="empresa">
           <Card className="rounded-2xl border-border/50 shadow-soft">
             <CardHeader>
               <CardTitle>Dados da Empresa</CardTitle>
@@ -128,10 +134,10 @@ export default function Configuracoes() {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
+        </TabsContent> */}
 
         {/* Notificações */}
-        <TabsContent value="notificacoes">
+        {/* <TabsContent value="notificacoes">
           <Card className="rounded-2xl border-border/50 shadow-soft">
             <CardHeader>
               <CardTitle>Preferências de Notificação</CardTitle>
@@ -187,10 +193,10 @@ export default function Configuracoes() {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
+        </TabsContent> */}
 
         {/* Aparência */}
-        <TabsContent value="aparencia">
+        {/* <TabsContent value="aparencia">
           <Card className="rounded-2xl border-border/50 shadow-soft">
             <CardHeader>
               <CardTitle>Aparência</CardTitle>
@@ -270,10 +276,10 @@ export default function Configuracoes() {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
+        </TabsContent> */}
 
         {/* Segurança */}
-        <TabsContent value="seguranca">
+        {/* <TabsContent value="seguranca">
           <Card className="rounded-2xl border-border/50 shadow-soft">
             <CardHeader>
               <CardTitle>Segurança</CardTitle>
@@ -318,10 +324,10 @@ export default function Configuracoes() {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
+        </TabsContent> */}
 
         {/* Integrações */}
-        <TabsContent value="integracoes">
+        {/* <TabsContent value="integracoes">
           <Card className="rounded-2xl border-border/50 shadow-soft">
             <CardHeader>
               <CardTitle>Integrações</CardTitle>
@@ -339,8 +345,8 @@ export default function Configuracoes() {
                     <p className="font-medium">{int.name}</p>
                     <p className="text-sm text-muted-foreground">{int.desc}</p>
                   </div>
-                  <Button 
-                    variant={int.status === "conectado" ? "outline" : "default"} 
+                  <Button
+                    variant={int.status === "conectado" ? "outline" : "default"}
                     className="rounded-xl"
                   >
                     {int.status === "conectado" ? "Configurar" : "Conectar"}
@@ -349,6 +355,11 @@ export default function Configuracoes() {
               ))}
             </CardContent>
           </Card>
+        </TabsContent> */}
+
+        {/* Config. Guincheiro */}
+        <TabsContent value="guincheiro">
+          <TowingSettingsTab />
         </TabsContent>
       </Tabs>
     </DashboardLayout>
