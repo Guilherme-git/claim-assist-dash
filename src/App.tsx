@@ -12,6 +12,7 @@ import AtendimentoDetalhes from "./pages/AtendimentoDetalhes";
 import Chamados from "./pages/Chamados";
 import ChamadoDetalhes from "./pages/ChamadoDetalhes";
 import Prestadores from "./pages/Prestadores";
+import GuinchoEmpresa from "./pages/GuinchoEmpresa";
 import Equipe from "./pages/Equipe";
 import Mapa from "./pages/Mapa";
 import Historico from "./pages/Historico";
@@ -39,6 +40,7 @@ const App = () => (
               <Route path="/atendimentos" element={<Atendimentos />} />
               <Route path="/atendimentos/:id" element={<AtendimentoDetalhes />} />
               <Route path="/prestadores" element={<Prestadores />} />
+              <Route path="/guincho-empresa" element={<GuinchoEmpresa />} />
               <Route path="/equipe" element={<Equipe />} />
               <Route path="/mapa" element={<Mapa />} />
               <Route path="/historico" element={<Historico />} />

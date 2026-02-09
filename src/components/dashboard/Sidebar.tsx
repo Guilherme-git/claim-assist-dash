@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
@@ -13,6 +14,8 @@ import {
   Truck,
   Clock,
   PhoneCall,
+  ChevronDown,
+  Building2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import logo from "@/assets/logo-utiliza.png";
@@ -24,13 +27,22 @@ interface NavItem {
   href: string;
   badge?: number;
   active?: boolean;
+  children?: NavItem[];
 }
 
 const navItems: NavItem[] = [
   { icon: LayoutDashboard, label: "Monitoramento", href: "/dashboard" },
-  { icon: Headphones, label: "Atendimentos", href: "/atendimentos"},
+  { icon: Headphones, label: "Atendimentos", href: "/atendimentos" },
   { icon: PhoneCall, label: "Chamados", href: "/chamados" },
-  { icon: Truck, label: "Prestadores", href: "/prestadores" },
+  {
+    icon: Truck,
+    label: "Prestadores",
+    href: "/prestadores",
+    children: [
+      { icon: Truck, label: "Motoristas", href: "/prestadores" },
+      { icon: Building2, label: "Guincho Empresa", href: "/guincho-empresa" },
+    ],
+  },
   { icon: Users, label: "Equipe", href: "/equipe" },
   { icon: MapPin, label: "Mapa ao Vivo", href: "/mapa" },
   { icon: Clock, label: "Histórico", href: "/historico" },
@@ -61,7 +73,13 @@ export function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const user = getStoredUser();
-
+  const [openDropdown, setOpenDropdown] = useState<string | null>(() => {
+    // Auto-open if current route matches a child
+    const match = navItems.find(
+      (item) => item.children?.some((child) => location.pathname === child.href)
+    );
+    return match ? match.label : null;
+  });
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
@@ -99,10 +117,69 @@ export function Sidebar() {
         {/* Navigation */}
         <nav className="flex-1 p-4 space-y-1.5">
           {navItems.map((item, index) => {
+            const hasChildren = item.children && item.children.length > 0;
+            const isChildActive = item.children?.some((child) => location.pathname === child.href);
             const isActive =
-              location.pathname === item.href ||
-              (item.href === "/atendimentos" && location.pathname.startsWith("/atendimentos/")) ||
-              (item.href === "/chamados" && location.pathname.startsWith("/chamados/"));
+              !hasChildren && (
+                location.pathname === item.href ||
+                (item.href === "/atendimentos" && location.pathname.startsWith("/atendimentos/")) ||
+                (item.href === "/chamados" && location.pathname.startsWith("/chamados/"))
+              );
+            const isDropdownOpen = openDropdown === item.label;
+
+            if (hasChildren) {
+              return (
+                <div key={item.label} className="animate-slide-in-left" style={{ animationDelay: `${index * 50}ms` }}>
+                  <button
+                    onClick={() => setOpenDropdown(isDropdownOpen ? null : item.label)}
+                    className={cn(
+                      "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group w-full",
+                      isChildActive
+                        ? "bg-gradient-to-r from-primary/20 to-primary/10 text-sidebar-foreground"
+                        : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                    )}
+                  >
+                    <item.icon className={cn(
+                      "h-5 w-5 flex-shrink-0 transition-transform duration-300",
+                      "group-hover:scale-110",
+                      collapsed && "mx-auto"
+                    )} strokeWidth={1.5} />
+                    {!collapsed && (
+                      <>
+                        <span className="font-medium text-sm flex-1 text-left">{item.label}</span>
+                        <ChevronDown className={cn(
+                          "h-4 w-4 transition-transform duration-300",
+                          isDropdownOpen && "rotate-180"
+                        )} />
+                      </>
+                    )}
+                  </button>
+                  {!collapsed && isDropdownOpen && (
+                    <div className="ml-4 mt-1 space-y-1 border-l-2 border-sidebar-border/30 pl-3">
+                      {item.children!.map((child) => {
+                        const isSubActive = location.pathname === child.href;
+                        return (
+                          <Link
+                            key={child.label}
+                            to={child.href}
+                            className={cn(
+                              "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-300 group",
+                              isSubActive
+                                ? "bg-gradient-to-r from-primary to-primary/80 text-primary-foreground shadow-md shadow-primary/20"
+                                : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                            )}
+                          >
+                            <child.icon className="h-4 w-4 flex-shrink-0" strokeWidth={1.5} />
+                            <span className="font-medium text-sm">{child.label}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
             return (
               <Link
                 key={item.label}
